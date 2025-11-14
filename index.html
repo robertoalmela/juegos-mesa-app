@@ -206,18 +206,50 @@
             display: none !important;
         }
 
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin: 20px 0;
+        }
+
+        .board-card {
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #e0e0e0;
+            font-weight: bold;
+            font-size: 13px;
+            word-break: break-word;
+        }
+
         @media (max-width: 480px) {
             .container {
-                padding: 20px;
+                padding: 15px;
+                max-width: 100%;
             }
             
             h1 {
-                font-size: 24px;
+                font-size: 22px;
             }
             
             .code-display .code {
                 font-size: 36px;
                 letter-spacing: 4px;
+            }
+            
+            .game-board {
+                gap: 5px;
+            }
+            
+            .board-card {
+                padding: 8px;
+                min-height: 45px;
+                font-size: 11px;
             }
         }
     </style>
@@ -298,11 +330,15 @@
                 <p>Comparte este código con los jugadores</p>
             </div>
 
-            <div class="warning">
-                ⚠️ Mantén esta ventana abierta mientras juegan
+            <div class="info">
+                💡 Ahora puedes unirte a tu propia sala introduciendo tu nombre y el código
             </div>
 
-            <div class="btn" onclick="showHome()">Crear Nueva Sala</div>
+            <label>Tu Nombre (para unirte):</label>
+            <input type="text" id="creatorName" placeholder="Tu nombre">
+
+            <div class="btn" onclick="creatorJoinGame()">Unirme a la Sala</div>
+            <div class="btn btn-secondary" onclick="showHome()">Crear Nueva Sala</div>
         </div>
 
         <!-- Pantalla: Unirse a Sala -->
@@ -512,7 +548,45 @@
 
         function displayLobby(roomCode) {
             document.getElementById('roomCode').textContent = roomCode;
+            document.getElementById('creatorName').value = '';
             showScreen('lobbyScreen');
+        }
+
+        // Creador se une a su propia sala
+        async function creatorJoinGame() {
+            const playerName = document.getElementById('creatorName').value.trim();
+            const roomCode = document.getElementById('roomCode').textContent;
+
+            if (!playerName) {
+                alert('Por favor introduce tu nombre');
+                return;
+            }
+
+            // Buscar sala en Firebase
+            try {
+                const snapshot = await database.ref('rooms/' + roomCode).once('value');
+                const room = snapshot.val();
+                
+                if (!room) {
+                    alert('Error: Sala no encontrada');
+                    return;
+                }
+
+                currentRoom = room;
+                currentRoom.code = roomCode;
+                roomRef = database.ref('rooms/' + roomCode);
+
+                // Jugar según el tipo de juego
+                if (room.game === 'quickstop') {
+                    playQuickStop(roomCode, playerName);
+                } else if (room.game === 'codigo') {
+                    playCodigoSecreto(roomCode, playerName, room);
+                } else if (room.game === 'blanco' || room.game === 'lobo') {
+                    showRole(room, playerName);
+                }
+            } catch (error) {
+                alert('Error al unirse: ' + error.message);
+            }
         }
 
         // Unirse a sala
@@ -656,7 +730,7 @@
                     <strong>Equipo: ${player.team.toUpperCase()}</strong><br>
                     Rol: ${player.role === 'spymaster' ? 'SPYMASTER (ves todo el tablero)' : 'OPERATIVE (adivina palabras)'}
                 </div>
-                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin: 20px 0;">
+                <div class="game-board">
             `;
 
             room.board.forEach((card, index) => {
@@ -672,7 +746,7 @@
                         '#fff');
                 
                 html += `
-                    <div style="background: ${bgColor}; padding: 15px; border-radius: 8px; text-align: center; min-height: 60px; display: flex; align-items: center; justify-content: center; border: 2px solid #e0e0e0; color: ${bgColor.includes('#000') ? 'white' : '#333'}; font-weight: bold; font-size: 14px;">
+                    <div class="board-card" style="background: ${bgColor}; color: ${bgColor.includes('#000') ? 'white' : '#333'};">
                         ${card.word}
                     </div>
                 `;
