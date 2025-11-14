@@ -1,30 +1,92 @@
 # 🎮 Juegos de Grupo - Plataforma Web
 
-Plataforma para jugar **Blanco** y **El Lobo** en grupo desde cualquier dispositivo móvil.
+Plataforma para jugar **Blanco**, **El Lobo**, **Código Secreto** y **Quick Stop** en grupo desde cualquier dispositivo móvil.
 
 ## 🎯 Características
 
-- ✅ **Sin backend necesario** - Todo funciona con localStorage del navegador
+- 🔥 **Backend con Firebase** - Sincronización en tiempo real entre dispositivos
 - 📱 **Móvil-friendly** - Diseño responsive optimizado para móviles
-- 🎲 **Dos juegos incluidos**:
+- 🎲 **Cuatro juegos incluidos**:
   - **Blanco**: Descubre quién no tiene la palabra secreta
   - **El Lobo**: Aldeanos vs Lobos - ¿quién sobrevivirá?
+  - **Código Secreto (Codenames)**: Equipos compiten encontrando agentes
+  - **Quick Stop (Basta!)**: Completa categorías con la letra indicada
 - 🔒 **Salas privadas** - Código único de 4 caracteres para cada sala
 - ⏱️ **Auto-limpieza** - Las salas se borran automáticamente después de 24 horas
+- 🆓 **100% Gratis** - Firebase tiene plan gratuito generoso
+
+## ⚙️ Configuración de Firebase (REQUERIDO)
+
+### Paso 1: Crear proyecto en Firebase
+
+1. Ve a [https://console.firebase.google.com/](https://console.firebase.google.com/)
+2. Haz clic en **"Agregar proyecto"**
+3. Nombra tu proyecto (ej: `juegos-mesa-app`)
+4. Desactiva Google Analytics (no lo necesitas)
+5. Haz clic en **"Crear proyecto"**
+
+### Paso 2: Configurar Realtime Database
+
+1. En el menú lateral: **Build → Realtime Database**
+2. Haz clic en **"Crear base de datos"**
+3. Selecciona ubicación (ej: `United States (us-central1)`)
+4. **Importante**: Selecciona **"Empezar en modo de prueba"**
+5. Haz clic en **"Habilitar"**
+
+### Paso 3: Obtener credenciales
+
+1. Haz clic en el ícono de engranaje ⛙️ junto a "Visión general del proyecto"
+2. Selecciona **"Configuración del proyecto"**
+3. En la sección "Tus apps", haz clic en el botón **`</>`** (Web)
+4. Nombra tu app (ej: `juegos-web`)
+5. Copia la configuración que aparece
+6. Abre el archivo `firebase-config.js` en tu proyecto
+7. Reemplaza los valores `TU_XXX_AQUI` con los valores de Firebase
+
+**Ejemplo de cómo debe quedar:**
+
+```javascript
+const firebaseConfig = {
+  apiKey: "AIzaSyAaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPp",
+  authDomain: "juegos-mesa-app.firebaseapp.com",
+  databaseURL: "https://juegos-mesa-app-default-rtdb.firebaseio.com",
+  projectId: "juegos-mesa-app",
+  storageBucket: "juegos-mesa-app.appspot.com",
+  messagingSenderId: "123456789012",
+  appId: "1:123456789012:web:abcdef123456"
+};
+```
+
+### Paso 4: Configurar reglas de seguridad (Opcional pero recomendado)
+
+Para producción, actualiza las reglas en **Realtime Database → Reglas**:
+
+```json
+{
+  "rules": {
+    "rooms": {
+      "$roomCode": {
+        ".read": true,
+        ".write": true,
+        ".indexOn": ["createdAt"]
+      }
+    }
+  }
+}
+```
 
 ## 🚀 Cómo usarlo
 
 1. **El organizador**:
    - Selecciona "Crear Nueva Sala"
-   - Elige el juego (Blanco o El Lobo)
-   - Introduce la palabra secreta (solo para Blanco)
-   - Introduce los nombres de todos los jugadores separados por comas
+   - Elige el juego (Blanco, Lobo, Código Secreto o Quick Stop)
+   - Configura el juego según sea necesario
    - Comparte el código de sala de 4 caracteres
 
 2. **Cada jugador**:
    - Selecciona "Unirse a Sala"
-   - Introduce su nombre exacto y el código de sala
-   - Ve su rol asignado secretamente
+   - Introduce su nombre y el código de sala
+   - Ve su rol o comienza a jugar
 
 ## 📦 Desplegar en GitHub Pages
 
@@ -73,43 +135,26 @@ https://TU_USUARIO.github.io/juegos-mesa-app/
 - **HTML5** - Estructura
 - **CSS3** - Estilos modernos con gradientes y animaciones
 - **JavaScript Vanilla** - Sin dependencias externas
-- **localStorage** - Persistencia de salas (sin servidor)
+- **Firebase Realtime Database** - Sincronización en tiempo real
 
-## 💾 ¿Necesito un backend?
+## 💾 Backend con Firebase
 
-**No**. Esta aplicación usa `localStorage` del navegador, que es:
+Esta aplicación usa **Firebase Realtime Database**, que ofrece:
 
 ✅ **Ventajas**:
-- 100% gratis
-- No necesita servidor
-- Funciona en GitHub Pages
-- Perfecto para grupos pequeños (5-15 personas)
-- Sin configuración
+- 🆓 **100% gratis** hasta 10GB de datos y 100k conexiones simultáneas
+- 🔄 **Sincronización en tiempo real** entre todos los dispositivos
+- ☁️ **Sin servidor propio** - Firebase se encarga de todo
+- 🔒 **Salas compartidas** - Todos pueden acceder con el código
+- ⏱️ **Auto-limpieza** - Las salas se borran automáticamente después de 24h
 
-⚠️ **Limitaciones**:
-- Las salas solo existen en el navegador del organizador
-- Si el organizador cierra/recarga la página, otros pueden unirse pero no se crean nuevas salas
-- Cada navegador tiene su propio localStorage independiente
-- Máximo ~5-10MB de datos
+### Límites del plan gratuito
 
-### Si necesitas backend real (opcional)
+- 1GB de datos almacenados
+- 10GB de transferencia mensual
+- 100k conexiones simultáneas
 
-Si tu grupo es muy grande o quieres persistencia permanente, considera:
-
-**Opción 1: Firebase (Recomendado - Gratis)**
-- Firebase Realtime Database tiene plan gratuito generoso
-- Sincronización en tiempo real entre dispositivos
-- [Tutorial rápido aquí](https://firebase.google.com/docs/database/web/start)
-
-**Opción 2: Supabase (Gratis)**
-- PostgreSQL con API REST automática
-- 500MB de base de datos gratis
-- [Supabase.com](https://supabase.com/)
-
-**Opción 3: Vercel + Serverless Functions (Gratis)**
-- Funciones serverless gratuitas
-- Perfecto para lógica simple
-- [Vercel.com](https://vercel.com/)
+**💡 Perfecto para grupos de hasta 100+ jugadores**
 
 ## 🎮 Reglas de los Juegos
 
@@ -130,6 +175,29 @@ Si tu grupo es muy grande o quieres persistencia permanente, considera:
    - **Lobos**: Eliminar a todos los Aldeanos
    - **Aldeanos**: Eliminar a todos los Lobos
 
+### 🔐 Código Secreto (Codenames)
+1. Dos equipos (Rojo y Azul) con un "spymaster" cada uno
+2. Tablero de 25 palabras con roles:
+   - 9 agentes rojos
+   - 8 agentes azules
+   - 7 transeúntes inocentes
+   - 1 asesino (💥 pierdes instantáneamente si lo eliges)
+3. El **spymaster** ve todos los roles y da pistas de UNA palabra + número
+   - Ejemplo: "animales 3" (3 palabras relacionadas con animales)
+4. El **equipo** adivina las palabras basándose en la pista
+5. Gana el equipo que encuentre todos sus agentes primero
+
+### 🏃 Quick Stop (Basta / Stop / Tutti Frutti)
+1. Categorías predefinidas: Nombre, Animal, Ciudad, Objeto, Comida, Color
+2. Una letra aleatoria se elige al inicio de cada ronda
+3. Todos escriben palabras que empiecen con esa letra para cada categoría
+4. El primero en terminar grita "¡STOP!"
+5. Puntuación:
+   - Respuesta única: **10 puntos**
+   - Respuesta repetida: **5 puntos**
+   - Sin respuesta: **0 puntos**
+6. Se juegan varias rondas y gana quien tenga más puntos totales
+
 ## 📱 Compatibilidad
 
 - ✅ Chrome (Android/iOS)
@@ -141,17 +209,23 @@ Si tu grupo es muy grande o quieres persistencia permanente, considera:
 
 **"Sala no encontrada"**
 - Verifica que el código esté correcto (4 caracteres)
-- La sala existe solo en el navegador del organizador
+- Asegúrate de haber configurado Firebase correctamente
 - Las salas se borran después de 24 horas
 
-**"Tu nombre no está en la lista"**
+**"Tu nombre no está en la lista"** (Blanco/Lobo/Código Secreto)
 - Escribe tu nombre exactamente como lo puso el organizador
 - Los espacios importan: "Juan" ≠ "Juan " ≠ " Juan"
+
+**"Error al crear sala" o "Error al unirse"**
+- Revisa que hayas configurado `firebase-config.js` correctamente
+- Abre la consola del navegador (F12) para ver el error específico
+- Verifica que la Realtime Database esté creada y en modo de prueba
 
 **La página no carga**
 - GitHub Pages tarda 1-2 minutos en activarse la primera vez
 - Limpia la caché del navegador (Ctrl+F5)
 - Verifica que el repositorio sea público
+- Asegúrate de que `firebase-config.js` esté en la raíz del proyecto
 
 ## 📄 Licencia
 

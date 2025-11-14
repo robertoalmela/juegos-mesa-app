@@ -1,0 +1,9 @@
+# Backups
+index-backup.html
+
+# Documentos de Word
+*.docx
+
+# Sistema
+.DS_Store
+Thumbs.db
