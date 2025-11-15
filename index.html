@@ -1147,9 +1147,11 @@
 
                 const isRepresentative = player.representative;
                 const myTeam = player.team;
-                const currentTeamPlayers = myTeam === 'A' ? room.teamAPlayers : room.teamBPlayers;
+                // Obtener jugadores del equipo que ESTÁ jugando su turno ahora
+                const currentTeamPlayers = room.currentTeam === 'A' ? room.teamAPlayers : room.teamBPlayers;
                 const currentPlayerName = currentTeamPlayers[room.currentPlayerIndex % currentTeamPlayers.length];
                 const isMyTurn = currentPlayerName === playerName;
+                const isMyTeamTurn = room.currentTeam === myTeam;
 
                 // Detectar fin de juego
                 if (room.currentRound > 3) {
@@ -1197,14 +1199,18 @@
                                     ${currentWord}
                                 </div>
                                 <div class="info">Tú describes/actúas. Tu equipo adivina (en persona).</div>
-                            ` : `
+                            ` : (isMyTeamTurn ? `
                                 <p style="font-size: 18px;"><strong>Turno de:</strong> ${currentPlayerName}</p>
-                                <p>Espera tu turno...</p>
-                            `}
+                                <p style="color: #667eea;">👂 Tu equipo está adivinando...</p>
+                            ` : `
+                                <p style="font-size: 18px;"><strong>Turno de equipo ${room.currentTeam}</strong></p>
+                                <p style="color: #999;">Esperando su turno...</p>
+                            `)}
                         </div>
                     `;
 
-                    if (isRepresentative && room.currentTeam === myTeam) {
+                    // Botón solo para representante del equipo que está jugando su turno
+                    if (isRepresentative && isMyTeamTurn) {
                         html += `
                             <div style="display: grid; gap: 10px; grid-template-columns: 1fr 1fr;">
                                 <div class="btn" onclick="markTimesUpCorrect('${roomCode}')">✅ ACERTÓ</div>
