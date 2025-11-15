@@ -1205,7 +1205,12 @@
                     `;
 
                     if (isRepresentative && room.currentTeam === myTeam) {
-                        html += '<div class="btn" onclick="markTimesUpCorrect(\'' + roomCode + '\')">✅ ACERTÓ</div>';
+                        html += `
+                            <div style="display: grid; gap: 10px; grid-template-columns: 1fr 1fr;">
+                                <div class="btn" onclick="markTimesUpCorrect('${roomCode}')">✅ ACERTÓ</div>
+                                <div class="btn btn-secondary" onclick="skipTimesUpWord('${roomCode}')">⏭️ PASAR</div>
+                            </div>
+                        `;
                     }
                 } else {
                     html += `
@@ -1274,6 +1279,28 @@
                     currentWordIndex: newWordIndex,
                     [scoreField]: room[scoreField] + 1
                 });
+            }
+        }
+
+        async function skipTimesUpWord(roomCode) {
+            const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+            const room = snapshot.val();
+
+            const newWordIndex = room.currentWordIndex + 1;
+
+            if (newWordIndex >= room.words.length) {
+                // Siguiente ronda sin sumar puntos
+                await database.ref(`rooms/${roomCode}`).update({
+                    currentRound: room.currentRound + 1,
+                    currentWordIndex: 0,
+                    currentTeam: 'A',
+                    currentPlayerIndex: 0,
+                    timerActive: false,
+                    timeRemaining: 30
+                });
+            } else {
+                // Siguiente palabra sin sumar puntos
+                await database.ref(`rooms/${roomCode}/currentWordIndex`).set(newWordIndex);
             }
         }
 
@@ -1542,22 +1569,62 @@
 
         function generateTimesUpWords(count) {
             const allWords = [
-                'Brad Pitt', 'Einstein', 'Michael Jackson', 'Marilyn Monroe', 'Leonardo DiCaprio',
-                'Cleopatra', 'Mozart', 'Picasso', 'Shakespeare', 'Frida Kahlo',
-                'Ronaldo', 'Messi', 'Michael Jordan', 'Serena Williams', 'Muhammad Ali',
-                'Harry Potter', 'Batman', 'Superman', 'Spider-Man', 'James Bond',
-                'Sherlock Holmes', 'Don Quijote', 'Romeo y Julieta', 'Pinocho', 'Cenicienta',
-                'La Torre Eiffel', 'El Big Ben', 'La Estatua de la Libertad', 'Las Pirámides', 'El Coliseo',
-                'Pizza', 'Sushi', 'Hamburguesa', 'Paella', 'Tacos',
-                'Netflix', 'Facebook', 'Google', 'Amazon', 'Apple',
-                'Titanic', 'Star Wars', 'El Padrino', 'Forrest Gump', 'Matrix',
-                'La Mona Lisa', 'El Guernica', 'La Noche Estrellada', 'El Grito', 'David de Miguel Ángel',
-                'París', 'Nueva York', 'Tokyo', 'Londres', 'Roma',
-                'Ferrari', 'Tesla', 'Coca-Cola', 'Nike', 'McDonald\'s',
-                'El Quijote', 'La Biblia', 'El Principito', 'Cien Años de Soledad', '1984',
-                'Perro', 'Gato', 'Elefante', 'León', 'Delfín',
-                'Piano', 'Guitarra', 'Violín', 'Batería', 'Trompeta',
-                'Fútbol', 'Baloncesto', 'Tenis', 'Golf', 'Natación'
+                // Personas famosas
+                'Brad Pitt (actor)', 'Albert Einstein (científico)', 'Michael Jackson (cantante)', 
+                'Marilyn Monroe (actriz)', 'Leonardo DiCaprio (actor)', 'Cleopatra (reina egipcia)',
+                'Mozart (compositor)', 'Pablo Picasso (pintor)', 'William Shakespeare (escritor)', 
+                'Frida Kahlo (pintora)', 'Cristiano Ronaldo (futbolista)', 'Lionel Messi (futbolista)',
+                'Michael Jordan (baloncestista)', 'Serena Williams (tenista)', 'Muhammad Ali (boxeador)',
+                'Steve Jobs (empresario)', 'Barack Obama (presidente)', 'Nelson Mandela (líder)',
+                
+                // Personajes de ficción
+                'Harry Potter (personaje)', 'Batman (superhéroe)', 'Superman (superhéroe)', 
+                'Spider-Man (superhéroe)', 'James Bond (agente secreto)', 'Sherlock Holmes (detective)',
+                'Don Quijote (personaje literario)', 'Romeo y Julieta (obra)', 'Pinocho (personaje)',
+                'Cenicienta (cuento)', 'Mickey Mouse (personaje)', 'Buzz Lightyear (personaje)',
+                
+                // Monumentos y lugares
+                'La Torre Eiffel (monumento)', 'El Big Ben (reloj)', 'La Estatua de la Libertad (monumento)',
+                'Las Pirámides de Egipto', 'El Coliseo Romano', 'La Gran Muralla China',
+                'El Taj Mahal (monumento)', 'La Torre de Pisa (monumento)',
+                
+                // Comida
+                'Pizza (comida)', 'Sushi (comida)', 'Hamburguesa (comida)', 'Paella (comida)', 
+                'Tacos (comida)', 'Pasta (comida)', 'Chocolate (comida)', 'Helado (comida)',
+                
+                // Marcas y empresas
+                'Netflix (plataforma)', 'Facebook (red social)', 'Google (buscador)', 
+                'Amazon (tienda online)', 'Apple (empresa)', 'Coca-Cola (bebida)', 
+                'Nike (marca deportiva)', 'McDonald\'s (restaurante)', 'Tesla (coche eléctrico)',
+                
+                // Películas
+                'Titanic (película)', 'Star Wars (película)', 'El Padrino (película)', 
+                'Forrest Gump (película)', 'Matrix (película)', 'El Rey León (película)',
+                'Jurassic Park (película)', 'E.T. (película)', 'Avatar (película)',
+                
+                // Obras de arte
+                'La Mona Lisa (cuadro)', 'El Guernica (cuadro)', 'La Noche Estrellada (cuadro)', 
+                'El Grito (cuadro de Munch)', 'El David (escultura)', 'La Última Cena (cuadro)',
+                
+                // Ciudades
+                'París (ciudad)', 'Nueva York (ciudad)', 'Tokio (ciudad)', 'Londres (ciudad)', 
+                'Roma (ciudad)', 'Barcelona (ciudad)', 'Madrid (ciudad)', 'Berlín (ciudad)',
+                
+                // Libros
+                'El Quijote (libro)', 'La Biblia (libro)', 'El Principito (libro)', 
+                'Cien Años de Soledad (libro)', '1984 (libro de Orwell)', 'Señor de los Anillos (libro)',
+                
+                // Animales
+                'Perro (animal)', 'Gato (animal)', 'Elefante (animal)', 'León (animal)', 
+                'Delfín (animal)', 'Jirafa (animal)', 'Pingüino (animal)', 'Tigre (animal)',
+                
+                // Instrumentos musicales
+                'Piano (instrumento)', 'Guitarra (instrumento)', 'Violín (instrumento)', 
+                'Batería (instrumento)', 'Trompeta (instrumento)', 'Saxofón (instrumento)',
+                
+                // Deportes
+                'Fútbol (deporte)', 'Baloncesto (deporte)', 'Tenis (deporte)', 
+                'Golf (deporte)', 'Natación (deporte)', 'Boxeo (deporte)'
             ];
             
             shuffleArray(allWords);
