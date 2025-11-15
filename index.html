@@ -538,7 +538,7 @@
                 room.dayCount = 1;
                 room.nightVictim = null;
                 room.dayVotes = {};
-            }
+            } else if (selectedGame === 'codigo') {
                 room.players = {};
                 room.board = generateCodigoSecretoBoard();
                 room.currentTeam = 'rojo';
