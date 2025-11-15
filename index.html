@@ -372,6 +372,7 @@
 
         <!-- Pantalla: Juego Activo -->
         <div id="gameScreen" class="screen">
+            <div id="gameHeader"></div>
             <div id="gameContent"></div>
             <div class="btn btn-secondary" onclick="showHome()">Salir</div>
         </div>
@@ -677,12 +678,14 @@
 
         function showRole(room, playerName) {
             const gameContent = document.getElementById('gameContent');
+            const gameHeader = document.getElementById('gameHeader');
             
             if (!room.players[playerName]) {
                 alert('Tu nombre no está en la lista de jugadores de esta sala');
                 return;
             }
-
+            
+            gameHeader.innerHTML = renderGameHeader(room.code, room.game);
             const player = room.players[playerName];
 
             if (room.game === 'blanco') {
@@ -761,12 +764,15 @@
 
         function playCodigoSecreto(roomCode, playerName, room) {
             const gameContent = document.getElementById('gameContent');
+            const gameHeader = document.getElementById('gameHeader');
             const player = room.players[playerName];
             
             if (!player) {
                 alert('No estás registrado en esta partida');
                 return;
             }
+
+            gameHeader.innerHTML = renderGameHeader(roomCode, 'codigo');
 
             let html = `
                 <h2 style="text-align: center; color: #667eea; margin-bottom: 20px;">🔐 Código Secreto</h2>
@@ -811,6 +817,9 @@
         // Quick Stop
         function playQuickStop(roomCode, playerName) {
             const gameContent = document.getElementById('gameContent');
+            const gameHeader = document.getElementById('gameHeader');
+            
+            gameHeader.innerHTML = renderGameHeader(roomCode, 'quickstop');
             
             roomRef.on('value', (snapshot) => {
                 const room = snapshot.val();
@@ -894,6 +903,127 @@
             }
         }
 
+        function renderGameHeader(roomCode, gameName) {
+            return `
+                <div style="background: #667eea; color: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-size: 12px; opacity: 0.9;">Sala:</div>
+                        <div style="font-size: 24px; font-weight: bold; letter-spacing: 3px;">${roomCode}</div>
+                    </div>
+                    <button onclick="showGameHelp('${gameName}')" style="background: white; color: #667eea; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: bold;">
+                        ❓ Ayuda
+                    </button>
+                </div>
+            `;
+        }
+
+        function showGameHelp(gameName) {
+            const rules = {
+                blanco: `
+                    <h3>🎭 Blanco - Reglas</h3>
+                    <p><strong>Objetivo:</strong></p>
+                    <ul>
+                        <li><strong>Blanco:</strong> Adivinar la palabra secreta sin ser descubierto</li>
+                        <li><strong>Otros:</strong> Descubrir quién es el Blanco sin revelar la palabra</li>
+                    </ul>
+                    <p><strong>Cómo jugar:</strong></p>
+                    <ol>
+                        <li>Todos reciben la misma palabra excepto el Blanco</li>
+                        <li>Por turnos, cada jugador da una pista sobre su palabra</li>
+                        <li>El Blanco debe disimular y dar pistas genéricas</li>
+                        <li>Al final, voten quién creen que es el Blanco</li>
+                    </ol>
+                `,
+                lobo: `
+                    <h3>🐺 El Lobo - Reglas</h3>
+                    <p><strong>Objetivo:</strong></p>
+                    <ul>
+                        <li><strong>Lobos:</strong> Eliminar a todos los aldeanos</li>
+                        <li><strong>Aldeanos:</strong> Eliminar a todos los lobos</li>
+                    </ul>
+                    <p><strong>Cómo jugar:</strong></p>
+                    <ol>
+                        <li>Los lobos se conocen entre sí</li>
+                        <li>De día: todos votan para eliminar a alguien</li>
+                        <li>De noche: los lobos eligen eliminar a un aldeano</li>
+                        <li>Usen la conversación para deducir quién es quién</li>
+                    </ol>
+                `,
+                codigo: `
+                    <h3>🔐 Código Secreto - Reglas</h3>
+                    <p><strong>Objetivo:</strong> Encuentra todos los agentes de tu equipo antes que el equipo rival</p>
+                    <p><strong>Roles:</strong></p>
+                    <ul>
+                        <li><strong>Spymaster:</strong> Ve todo el tablero. Da pistas de UNA palabra + número</li>
+                        <li><strong>Operatives:</strong> Adivinan palabras basadas en las pistas</li>
+                    </ul>
+                    <p><strong>Colores:</strong></p>
+                    <ul>
+                        <li><strong>Rojo/Azul:</strong> Agentes de cada equipo</li>
+                        <li><strong>Gris:</strong> Transeúntes inocentes (pierdes el turno)</li>
+                        <li><strong>Negro:</strong> Asesino (💥 pierdes instantáneamente)</li>
+                    </ul>
+                    <p><strong>Spymaster clickea las palabras</strong> que elijan los operatives para revelarlas.</p>
+                `,
+                quickstop: `
+                    <h3>🏃 Quick Stop - Reglas</h3>
+                    <p><strong>Objetivo:</strong> Ser el primero en completar todas las categorías</p>
+                    <p><strong>Cómo jugar:</strong></p>
+                    <ol>
+                        <li>Se elige una letra aleatoria</li>
+                        <li>Completa cada categoría con palabras que empiecen con esa letra</li>
+                        <li>El primero en terminar grita "¡STOP!"</li>
+                        <li>Comparan respuestas: única = 10pts, repetida = 5pts, vacía = 0pts</li>
+                    </ol>
+                    <p><strong>Categorías:</strong> Nombre, Animal, Ciudad, Objeto, Comida, Color</p>
+                `,
+                loveletter: `
+                    <h3>💌 Love Letter - Reglas</h3>
+                    <p><strong>Objetivo:</strong> Sé el último en pie o termina con la carta más alta</p>
+                    <p><strong>Cómo jugar:</strong></p>
+                    <ol>
+                        <li>Cada turno: roba 1 carta y juega 1 carta</li>
+                        <li>Cada carta tiene un efecto especial</li>
+                        <li>Gana la ronda el último jugador o quien tenga la carta más alta</li>
+                        <li>Primer jugador en alcanzar los puntos objetivo gana</li>
+                    </ol>
+                    <p><strong>Cartas:</strong></p>
+                    <ul style="font-size: 13px;">
+                        <li><strong>1-Guardia:</strong> Adivina la carta de un jugador</li>
+                        <li><strong>2-Sacerdote:</strong> Mira la carta de un jugador</li>
+                        <li><strong>3-Barón:</strong> Compara cartas, el menor se elimina</li>
+                        <li><strong>4-Doncella:</strong> Protección hasta tu próximo turno</li>
+                        <li><strong>5-Príncipe:</strong> Un jugador descarta y roba</li>
+                        <li><strong>6-Rey:</strong> Intercambia cartas con otro jugador</li>
+                        <li><strong>7-Condesa:</strong> Debes jugarla si tienes Rey o Príncipe</li>
+                        <li><strong>8-Princesa:</strong> Si la descartas, quedas eliminado</li>
+                    </ul>
+                `
+            };
+
+            const rule = rules[gameName] || '<p>Reglas no disponibles</p>';
+            const helpContent = `
+                <div style="background: white; padding: 30px; border-radius: 15px; max-width: 500px; margin: 20px auto;">
+                    ${rule}
+                    <button onclick="document.getElementById('helpOverlay').style.display='none'" 
+                            style="width: 100%; padding: 15px; margin-top: 20px; background: #667eea; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: bold; cursor: pointer;">
+                        Cerrar
+                    </button>
+                </div>
+            `;
+
+            let overlay = document.getElementById('helpOverlay');
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.id = 'helpOverlay';
+                overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; align-items: center; justify-content: center; overflow-y: auto;';
+                overlay.onclick = (e) => { if (e.target === overlay) overlay.style.display = 'none'; };
+                document.body.appendChild(overlay);
+            }
+            overlay.innerHTML = helpContent;
+            overlay.style.display = 'flex';
+        }
+
         // ============================================
         // LOVE LETTER - Lógica completa del juego
         // ============================================
@@ -950,6 +1080,9 @@
 
         function playLoveLetter(roomCode, playerName) {
             const gameContent = document.getElementById('gameContent');
+            const gameHeader = document.getElementById('gameHeader');
+            
+            gameHeader.innerHTML = renderGameHeader(roomCode, 'loveletter');
             
             roomRef.on('value', (snapshot) => {
                 const room = snapshot.val();
