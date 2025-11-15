@@ -765,53 +765,118 @@
         function playCodigoSecreto(roomCode, playerName, room) {
             const gameContent = document.getElementById('gameContent');
             const gameHeader = document.getElementById('gameHeader');
-            const player = room.players[playerName];
-            
-            if (!player) {
-                alert('No estás registrado en esta partida');
-                return;
-            }
 
             gameHeader.innerHTML = renderGameHeader(roomCode, 'codigo');
 
-            let html = `
-                <h2 style="text-align: center; color: #667eea; margin-bottom: 20px;">🔐 Código Secreto</h2>
-                <div style="background: ${player.team === 'rojo' ? '#ff6b6b' : '#4dabf7'}; color: white; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 20px;">
-                    <strong>Equipo: ${player.team.toUpperCase()}</strong><br>
-                    Rol: ${player.role === 'spymaster' ? 'SPYMASTER (ves todo el tablero)' : 'OPERATIVE (adivina palabras)'}
-                </div>
-                <div class="game-board">
-            `;
+            roomRef.on('value', (snapshot) => {
+                const room = snapshot.val();
+                if (!room) return;
 
-            room.board.forEach((card, index) => {
-                const showRole = player.role === 'spymaster';
-                const bgColor = card.revealed ? 
-                    (card.role === 'rojo' ? '#ff6b6b' : 
-                     card.role === 'azul' ? '#4dabf7' : 
-                     card.role === 'asesino' ? '#000' : '#adb5bd') :
-                    (showRole ? 
-                        (card.role === 'rojo' ? '#ff6b6b80' : 
-                         card.role === 'azul' ? '#4dabf780' : 
-                         card.role === 'asesino' ? '#00000080' : '#adb5bd80') : 
-                        '#fff');
-                
-                html += `
-                    <div class="board-card" style="background: ${bgColor}; color: ${bgColor.includes('#000') ? 'white' : '#333'};">
-                        ${card.word}
+                const player = room.players[playerName];
+                if (!player) {
+                    gameContent.innerHTML = '<p style="color: red;">No estás registrado en esta partida</p>';
+                    return;
+                }
+
+                // Contar agentes por equipo
+                let rojoTotal = 0, rojoRevealed = 0;
+                let azulTotal = 0, azulRevealed = 0;
+                let asesinRevealed = false;
+                let gameOver = false;
+                let winner = null;
+
+                room.board.forEach(card => {
+                    if (card.role === 'rojo') {
+                        rojoTotal++;
+                        if (card.revealed) rojoRevealed++;
+                    } else if (card.role === 'azul') {
+                        azulTotal++;
+                        if (card.revealed) azulRevealed++;
+                    } else if (card.role === 'asesino' && card.revealed) {
+                        asesinRevealed = true;
+                        // El equipo que reveló el asesino pierde
+                        winner = room.currentTeam === 'rojo' ? 'AZUL' : 'ROJO';
+                        gameOver = true;
+                    }
+                });
+
+                // Detectar victoria por completar agentes
+                if (rojoRevealed === rojoTotal && !gameOver) {
+                    winner = 'ROJO';
+                    gameOver = true;
+                }
+                if (azulRevealed === azulTotal && !gameOver) {
+                    winner = 'AZUL';
+                    gameOver = true;
+                }
+
+                if (gameOver) {
+                    gameContent.innerHTML = `
+                        <h2 style="text-align: center; color: #667eea;">🏆 FIN DEL JUEGO</h2>
+                        <div style="background: ${winner === 'ROJO' ? '#ff6b6b' : '#4dabf7'}; color: white; padding: 40px; border-radius: 15px; text-align: center; margin: 30px 0;">
+                            <h1 style="font-size: 48px; margin: 0;">¡Equipo ${winner} GANA!</h1>
+                            ${asesinRevealed ? '<p style="margin-top: 20px;">El otro equipo reveló al ASESINO 💥</p>' : '<p style="margin-top: 20px;">¡Encontraron todos sus agentes!</p>'}
+                        </div>
+                    `;
+                    return;
+                }
+
+                let html = `
+                    <h2 style="text-align: center; color: #667eea; margin-bottom: 10px;">🔐 Código Secreto</h2>
+                    <div style="background: ${player.team === 'rojo' ? '#ff6b6b' : '#4dabf7'}; color: white; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 15px;">
+                        <strong>Equipo: ${player.team.toUpperCase()}</strong><br>
+                        Rol: ${player.role === 'spymaster' ? 'SPYMASTER' : 'OPERATIVE'}
+                    </div>
+                    <div style="display: flex; justify-content: space-around; margin-bottom: 15px;">
+                        <div style="background: #ff6b6b; color: white; padding: 10px 20px; border-radius: 8px; font-weight: bold;">
+                            🔴 Rojo: ${rojoRevealed}/${rojoTotal}
+                        </div>
+                        <div style="background: #4dabf7; color: white; padding: 10px 20px; border-radius: 8px; font-weight: bold;">
+                            🔵 Azul: ${azulRevealed}/${azulTotal}
+                        </div>
+                    </div>
+                    <div class="game-board">
+                `;
+
+                room.board.forEach((card, index) => {
+                    const showRole = player.role === 'spymaster';
+                    const bgColor = card.revealed ? 
+                        (card.role === 'rojo' ? '#ff6b6b' : 
+                         card.role === 'azul' ? '#4dabf7' : 
+                         card.role === 'asesino' ? '#000' : '#adb5bd') :
+                        (showRole ? 
+                            (card.role === 'rojo' ? '#ff6b6b80' : 
+                             card.role === 'azul' ? '#4dabf780' : 
+                             card.role === 'asesino' ? '#00000080' : '#adb5bd80') : 
+                            '#fff');
+                    
+                    const isClickable = player.role === 'spymaster' && !card.revealed;
+                    const cursor = isClickable ? 'pointer' : 'default';
+                    const onclick = isClickable ? `onclick="revealCodigoCard('${roomCode}', ${index})"` : '';
+                    
+                    html += `
+                        <div class="board-card" style="background: ${bgColor}; color: ${bgColor.includes('#000') ? 'white' : '#333'}; cursor: ${cursor};" ${onclick}>
+                            ${card.word}
+                        </div>
+                    `;
+                });
+
+                html += `</div>
+                    <div class="info">
+                        ${player.role === 'spymaster' ? 
+                            '💡 Da pistas de UNA palabra + número. <strong>Clickea las palabras</strong> que elijan tus operatives para revelarlas.' : 
+                            '💡 Escucha a tu spymaster y adivina las palabras de tu equipo. El spymaster revelará las palabras.'}
                     </div>
                 `;
+
+                gameContent.innerHTML = html;
             });
 
-            html += `</div>
-                <div class="info">
-                    ${player.role === 'spymaster' ? 
-                        '💡 Da pistas de UNA palabra + número (ej: "animales 3")' : 
-                        '💡 Escucha a tu spymaster y adivina las palabras de tu equipo'}
-                </div>
-            `;
-
-            gameContent.innerHTML = html;
             showScreen('gameScreen');
+        }
+
+        async function revealCodigoCard(roomCode, cardIndex) {
+            await database.ref(`rooms/${roomCode}/board/${cardIndex}/revealed`).set(true);
         }
 
         // Quick Stop
