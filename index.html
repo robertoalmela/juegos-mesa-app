@@ -292,6 +292,10 @@
                     <h3>💌 Love Letter</h3>
                     <p>Juego de deducción y faroleo. Sé el último en pie o termina con la carta más alta.</p>
                 </div>
+                <div class="game-card" onclick="selectGame('timesup')">
+                    <h3>⏱️ Time's Up</h3>
+                    <p>3 rondas con las mismas palabras: Describe, Una palabra, Mímica. ¡Contra el tiempo!</p>
+                </div>
             </div>
 
             <!-- Configuración Blanco -->
@@ -324,11 +328,21 @@
                 </div>
             </div>
 
+            <!-- Configuración Time's Up -->
+            <div id="timesupConfig" class="hidden">
+                <label>Número de Palabras:</label>
+                <input type="number" id="numWords" value="40" min="20" max="60">
+                
+                <div class="info">
+                    💡 Time's Up: Divide jugadores en 2 equipos. Los primeros 2 jugadores de la lista serán los representantes (marcan aciertos).
+                </div>
+            </div>
+
             <label>Nombres de Jugadores (separados por coma):</label>
             <textarea id="playerNames" placeholder="Juan, María, Pedro, Ana"></textarea>
             
             <div class="info">
-                ℹ️ Mínimo 3 jugadores para Blanco/Lobo, 4 para Código Secreto, 2-4 para Love Letter
+                ℹ️ Mínimo 3 jugadores para Blanco/Lobo, 4 para Código Secreto/Time's Up, 2-4 para Love Letter
             </div>
 
             <div class="btn" onclick="createGame()">Crear Sala</div>
@@ -425,6 +439,7 @@
             document.getElementById('blancoConfig').classList.add('hidden');
             document.getElementById('quickstopConfig').classList.add('hidden');
             document.getElementById('loveletterConfig').classList.add('hidden');
+            document.getElementById('timesupConfig').classList.add('hidden');
             
             if (game === 'blanco') {
                 document.getElementById('blancoConfig').classList.remove('hidden');
@@ -432,6 +447,8 @@
                 document.getElementById('quickstopConfig').classList.remove('hidden');
             } else if (game === 'loveletter') {
                 document.getElementById('loveletterConfig').classList.remove('hidden');
+            } else if (game === 'timesup') {
+                document.getElementById('timesupConfig').classList.remove('hidden');
             }
             
             // Quick Stop no necesita lista de jugadores
@@ -474,13 +491,13 @@
 
                 players = playerNamesInput.split(',').map(name => name.trim()).filter(name => name);
                 
-                if (players.length < 3 && selectedGame !== 'codigo' && selectedGame !== 'loveletter') {
+                if (players.length < 3 && selectedGame !== 'codigo' && selectedGame !== 'loveletter' && selectedGame !== 'timesup') {
                     alert('Se necesitan mínimo 3 jugadores');
                     return;
                 }
                 
-                if (players.length < 4 && selectedGame === 'codigo') {
-                    alert('Código Secreto necesita mínimo 4 jugadores (2 por equipo)');
+                if (players.length < 4 && (selectedGame === 'codigo' || selectedGame === 'timesup')) {
+                    alert('Código Secreto y Time\'s Up necesitan mínimo 4 jugadores (2 por equipo)');
                     return;
                 }
                 
@@ -576,6 +593,37 @@
                         protected: false
                     };
                 });
+            } else if (selectedGame === 'timesup') {
+                const numWords = parseInt(document.getElementById('numWords').value) || 40;
+                const words = generateTimesUpWords(numWords);
+                
+                // Dividir jugadores en 2 equipos
+                const half = Math.ceil(players.length / 2);
+                const teamA = players.slice(0, half);
+                const teamB = players.slice(half);
+                
+                room.words = words;
+                room.currentRound = 1; // 1=Describe, 2=Una palabra, 3=Mímica
+                room.currentTeam = 'A';
+                room.teamAScore = 0;
+                room.teamBScore = 0;
+                room.teamAPlayers = teamA;
+                room.teamBPlayers = teamB;
+                room.representativeA = teamA[0]; // Primer jugador equipo A marca aciertos
+                room.representativeB = teamB[0]; // Primer jugador equipo B marca aciertos
+                room.currentPlayerIndex = 0;
+                room.currentWordIndex = 0;
+                room.timerActive = false;
+                room.timeRemaining = 30;
+                room.wordsGuessedThisRound = [];
+                
+                room.players = {};
+                players.forEach((name, index) => {
+                    room.players[name] = {
+                        team: index < half ? 'A' : 'B',
+                        representative: (index === 0 || index === half)
+                    };
+                });
             }
 
             // Guardar en Firebase
@@ -634,6 +682,8 @@
                     showRole(room, playerName);
                 } else if (room.game === 'lobo') {
                     playLobo(roomCode, playerName);
+                } else if (room.game === 'timesup') {
+                    playTimesUp(roomCode, playerName);
                 }
             } catch (error) {
                 alert('Error al unirse: ' + error.message);
@@ -680,6 +730,8 @@
                     showRole(room, playerName);
                 } else if (room.game === 'lobo') {
                     playLobo(roomCode, playerName);
+                } else if (room.game === 'timesup') {
+                    playTimesUp(roomCode, playerName);
                 }
             } catch (error) {
                 alert('Error al unirse: ' + error.message);
@@ -1071,6 +1123,190 @@
             alert('Voto enviado al moderador');
         }
 
+        // ============================================
+        // TIME'S UP - Lógica completa del juego
+        // ============================================
+
+        let timesUpInterval = null;
+
+        function playTimesUp(roomCode, playerName) {
+            const gameContent = document.getElementById('gameContent');
+            const gameHeader = document.getElementById('gameHeader');
+
+            gameHeader.innerHTML = renderGameHeader(roomCode, 'timesup');
+
+            roomRef.on('value', (snapshot) => {
+                const room = snapshot.val();
+                if (!room) return;
+
+                const player = room.players[playerName];
+                if (!player) {
+                    gameContent.innerHTML = '<p style="color: red;">No estás registrado en esta partida</p>';
+                    return;
+                }
+
+                const isRepresentative = player.representative;
+                const myTeam = player.team;
+                const currentTeamPlayers = myTeam === 'A' ? room.teamAPlayers : room.teamBPlayers;
+                const currentPlayerName = currentTeamPlayers[room.currentPlayerIndex % currentTeamPlayers.length];
+                const isMyTurn = currentPlayerName === playerName;
+
+                // Detectar fin de juego
+                if (room.currentRound > 3) {
+                    const winner = room.teamAScore > room.teamBScore ? 'A' : (room.teamBScore > room.teamAScore ? 'B' : 'EMPATE');
+                    gameContent.innerHTML = `
+                        <h2 style="text-align: center; color: #667eea;">🏆 FIN DEL JUEGO</h2>
+                        <div style="background: ${winner === 'A' ? '#ff6b6b' : winner === 'B' ? '#4dabf7' : '#ffc107'}; color: white; padding: 40px; border-radius: 15px; text-align: center; margin: 30px 0;">
+                            <h1 style="font-size: 48px; margin: 0;">${winner === 'EMPATE' ? '¡EMPATE!' : '¡Equipo ' + winner + ' GANA!'}</h1>
+                            <p style="margin-top: 20px;">Equipo A: ${room.teamAScore} | Equipo B: ${room.teamBScore}</p>
+                        </div>
+                    `;
+                    if (timesUpInterval) {
+                        clearInterval(timesUpInterval);
+                        timesUpInterval = null;
+                    }
+                    return;
+                }
+
+                const roundNames = ['', 'Descripción', 'Una Palabra', 'Mímica'];
+                const isPlaying = room.timerActive;
+
+                let html = `
+                    <h2 style="text-align: center; color: #667eea; margin-bottom: 10px;">⏱️ Time's Up</h2>
+                    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 15px;">
+                        <strong>Ronda ${room.currentRound}: ${roundNames[room.currentRound]}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-around; margin-bottom: 15px;">
+                        <div style="background: #ff6b6b; color: white; padding: 15px 20px; border-radius: 8px; font-weight: bold;">
+                            Equipo A: ${room.teamAScore}
+                        </div>
+                        <div style="background: #4dabf7; color: white; padding: 15px 20px; border-radius: 8px; font-weight: bold;">
+                            Equipo B: ${room.teamBScore}
+                        </div>
+                    </div>
+                `;
+
+                if (isPlaying) {
+                    const currentWord = room.words[room.currentWordIndex];
+                    
+                    html += `
+                        <div style="background: ${isMyTurn ? '#fffbea' : '#f8f9fa'}; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 15px; border: 3px solid ${isMyTurn ? '#ffc107' : '#e0e0e0'};">
+                            <div style="font-size: 48px; font-weight: bold; margin: 20px 0;">⏱️ ${room.timeRemaining}s</div>
+                            ${isMyTurn ? `
+                                <div style="font-size: 32px; font-weight: bold; color: #667eea; margin: 20px 0; padding: 20px; background: white; border-radius: 10px;">
+                                    ${currentWord}
+                                </div>
+                                <div class="info">Tú describes/actúas. Tu equipo adivina (en persona).</div>
+                            ` : `
+                                <p style="font-size: 18px;"><strong>Turno de:</strong> ${currentPlayerName}</p>
+                                <p>Espera tu turno...</p>
+                            `}
+                        </div>
+                    `;
+
+                    if (isRepresentative && room.currentTeam === myTeam) {
+                        html += '<div class="btn" onclick="markTimesUpCorrect(\'' + roomCode + '\')">✅ ACERTÓ</div>';
+                    }
+                } else {
+                    html += `
+                        <div style="background: #e7f3ff; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 15px;">
+                            <p style="font-size: 18px;"><strong>Turno de equipo ${room.currentTeam}</strong></p>
+                            <p>Jugador activo: ${currentPlayerName}</p>
+                            ${currentPlayerName === playerName ? '<div class="btn" onclick="startTimesUpTurn(\'' + roomCode + '\')">▶️ Iniciar Turno (30s)</div>' : '<p style="color: #666;">Esperando...</p>'}
+                        </div>
+                    `;
+                }
+
+                gameContent.innerHTML = html;
+
+                // Gestionar temporizador
+                if (isPlaying) {
+                    if (!timesUpInterval) {
+                        timesUpInterval = setInterval(() => {
+                            database.ref(`rooms/${roomCode}`).once('value').then(snap => {
+                                const r = snap.val();
+                                if (r && r.timerActive && r.timeRemaining > 0) {
+                                    database.ref(`rooms/${roomCode}/timeRemaining`).set(r.timeRemaining - 1);
+                                } else if (r && r.timeRemaining <= 0) {
+                                    endTimesUpTurn(roomCode);
+                                }
+                            });
+                        }, 1000);
+                    }
+                } else {
+                    if (timesUpInterval) {
+                        clearInterval(timesUpInterval);
+                        timesUpInterval = null;
+                    }
+                }
+            });
+
+            showScreen('gameScreen');
+        }
+
+        async function startTimesUpTurn(roomCode) {
+            await database.ref(`rooms/${roomCode}`).update({
+                timerActive: true,
+                timeRemaining: 30
+            });
+        }
+
+        async function markTimesUpCorrect(roomCode) {
+            const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+            const room = snapshot.val();
+
+            const scoreField = room.currentTeam === 'A' ? 'teamAScore' : 'teamBScore';
+            const newWordIndex = room.currentWordIndex + 1;
+
+            if (newWordIndex >= room.words.length) {
+                // Siguiente ronda
+                await database.ref(`rooms/${roomCode}`).update({
+                    currentRound: room.currentRound + 1,
+                    currentWordIndex: 0,
+                    currentTeam: 'A',
+                    currentPlayerIndex: 0,
+                    timerActive: false,
+                    timeRemaining: 30,
+                    [scoreField]: room[scoreField] + 1
+                });
+            } else {
+                await database.ref(`rooms/${roomCode}`).update({
+                    currentWordIndex: newWordIndex,
+                    [scoreField]: room[scoreField] + 1
+                });
+            }
+        }
+
+        async function endTimesUpTurn(roomCode) {
+            const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+            const room = snapshot.val();
+
+            const currentTeamPlayers = room.currentTeam === 'A' ? room.teamAPlayers : room.teamBPlayers;
+            const nextPlayerIndex = room.currentPlayerIndex + 1;
+            const nextTeam = room.currentTeam === 'A' ? 'B' : 'A';
+
+            if (nextPlayerIndex >= currentTeamPlayers.length) {
+                // Cambiar de equipo
+                await database.ref(`rooms/${roomCode}`).update({
+                    currentTeam: nextTeam,
+                    currentPlayerIndex: 0,
+                    timerActive: false,
+                    timeRemaining: 30
+                });
+            } else {
+                await database.ref(`rooms/${roomCode}`).update({
+                    currentPlayerIndex: nextPlayerIndex,
+                    timerActive: false,
+                    timeRemaining: 30
+                });
+            }
+
+            if (timesUpInterval) {
+                clearInterval(timesUpInterval);
+                timesUpInterval = null;
+            }
+        }
+
         // Quick Stop
         function playQuickStop(roomCode, playerName) {
             const gameContent = document.getElementById('gameContent');
@@ -1255,6 +1491,25 @@
                         <li><strong>7-Condesa:</strong> Debes jugarla si tienes Rey o Príncipe</li>
                         <li><strong>8-Princesa:</strong> Si la descartas, quedas eliminado</li>
                     </ul>
+                `,
+                timesup: `
+                    <h3>⏱️ Time's Up - Reglas</h3>
+                    <p><strong>Objetivo:</strong> Adivinar el máximo de palabras posible en 3 rondas distintas</p>
+                    <p><strong>3 Rondas con las MISMAS palabras:</strong></p>
+                    <ol>
+                        <li><strong>Ronda 1 - Descripción:</strong> Puedes describir con todas las palabras que quieras</li>
+                        <li><strong>Ronda 2 - Una palabra:</strong> Solo UNA palabra de pista</li>
+                        <li><strong>Ronda 3 - Mímica:</strong> Solo gestos y sonidos, sin hablar</li>
+                    </ol>
+                    <p><strong>Turnos:</strong></p>
+                    <ul>
+                        <li>30 segundos por jugador</li>
+                        <li>El jugador activo ve la palabra y la describe/actúa</li>
+                        <li>Su equipo adivina (en persona, no en app)</li>
+                        <li><strong>Representantes marcan aciertos</strong> con el botón</li>
+                        <li>Si no marcas antes de que acabe el tiempo, se considera fallo</li>
+                    </ul>
+                    <p>El equipo con más aciertos después de las 3 rondas gana.</p>
                 `
             };
 
@@ -1279,6 +1534,34 @@
             }
             overlay.innerHTML = helpContent;
             overlay.style.display = 'flex';
+        }
+
+        // ============================================
+        // TIME'S UP - Generador de palabras
+        // ============================================
+
+        function generateTimesUpWords(count) {
+            const allWords = [
+                'Brad Pitt', 'Einstein', 'Michael Jackson', 'Marilyn Monroe', 'Leonardo DiCaprio',
+                'Cleopatra', 'Mozart', 'Picasso', 'Shakespeare', 'Frida Kahlo',
+                'Ronaldo', 'Messi', 'Michael Jordan', 'Serena Williams', 'Muhammad Ali',
+                'Harry Potter', 'Batman', 'Superman', 'Spider-Man', 'James Bond',
+                'Sherlock Holmes', 'Don Quijote', 'Romeo y Julieta', 'Pinocho', 'Cenicienta',
+                'La Torre Eiffel', 'El Big Ben', 'La Estatua de la Libertad', 'Las Pirámides', 'El Coliseo',
+                'Pizza', 'Sushi', 'Hamburguesa', 'Paella', 'Tacos',
+                'Netflix', 'Facebook', 'Google', 'Amazon', 'Apple',
+                'Titanic', 'Star Wars', 'El Padrino', 'Forrest Gump', 'Matrix',
+                'La Mona Lisa', 'El Guernica', 'La Noche Estrellada', 'El Grito', 'David de Miguel Ángel',
+                'París', 'Nueva York', 'Tokyo', 'Londres', 'Roma',
+                'Ferrari', 'Tesla', 'Coca-Cola', 'Nike', 'McDonald\'s',
+                'El Quijote', 'La Biblia', 'El Principito', 'Cien Años de Soledad', '1984',
+                'Perro', 'Gato', 'Elefante', 'León', 'Delfín',
+                'Piano', 'Guitarra', 'Violín', 'Batería', 'Trompeta',
+                'Fútbol', 'Baloncesto', 'Tenis', 'Golf', 'Natación'
+            ];
+            
+            shuffleArray(allWords);
+            return allWords.slice(0, count);
         }
 
         // ============================================
