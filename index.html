@@ -527,12 +527,18 @@
                 shuffleArray(roles);
                 
                 room.players = {};
+                room.moderator = players[0]; // Primer jugador es moderador
                 players.forEach((name, index) => {
                     room.players[name] = {
-                        role: roles[index]
+                        role: index === 0 ? 'moderador' : roles[index - 1], // Moderador no juega
+                        alive: index === 0 ? true : true
                     };
                 });
-            } else if (selectedGame === 'codigo') {
+                room.phase = 'night';
+                room.dayCount = 1;
+                room.nightVictim = null;
+                room.dayVotes = {};
+            }
                 room.players = {};
                 room.board = generateCodigoSecretoBoard();
                 room.currentTeam = 'rojo';
@@ -624,8 +630,10 @@
                     playCodigoSecreto(roomCode, playerName, room);
                 } else if (room.game === 'loveletter') {
                     playLoveLetter(roomCode, playerName);
-                } else if (room.game === 'blanco' || room.game === 'lobo') {
+                } else if (room.game === 'blanco') {
                     showRole(room, playerName);
+                } else if (room.game === 'lobo') {
+                    playLobo(roomCode, playerName);
                 }
             } catch (error) {
                 alert('Error al unirse: ' + error.message);
@@ -668,8 +676,10 @@
                     playCodigoSecreto(roomCode, playerName, room);
                 } else if (room.game === 'loveletter') {
                     playLoveLetter(roomCode, playerName);
-                } else if (room.game === 'blanco' || room.game === 'lobo') {
+                } else if (room.game === 'blanco') {
                     showRole(room, playerName);
+                } else if (room.game === 'lobo') {
+                    playLobo(roomCode, playerName);
                 }
             } catch (error) {
                 alert('Error al unirse: ' + error.message);
@@ -877,6 +887,210 @@
 
         async function revealCodigoCard(roomCode, cardIndex) {
             await database.ref(`rooms/${roomCode}/board/${cardIndex}/revealed`).set(true);
+        }
+
+        // ============================================
+        // EL LOBO - Sistema completo con moderador
+        // ============================================
+
+        function playLobo(roomCode, playerName) {
+            const gameContent = document.getElementById('gameContent');
+            const gameHeader = document.getElementById('gameHeader');
+
+            gameHeader.innerHTML = renderGameHeader(roomCode, 'lobo');
+
+            roomRef.on('value', (snapshot) => {
+                const room = snapshot.val();
+                if (!room) return;
+
+                const player = room.players[playerName];
+                if (!player) {
+                    gameContent.innerHTML = '<p style="color: red;">No estás registrado en esta partida</p>';
+                    return;
+                }
+
+                const isModerator = player.role === 'moderador';
+                const alivePlayers = Object.keys(room.players).filter(p => room.players[p].alive && room.players[p].role !== 'moderador');
+                const lobos = Object.keys(room.players).filter(p => room.players[p].role === 'lobo' && room.players[p].alive);
+                const aldeanos = Object.keys(room.players).filter(p => room.players[p].role === 'aldeano' && room.players[p].alive);
+
+                // Detectar fin de juego
+                if (lobos.length === 0) {
+                    gameContent.innerHTML = `
+                        <h2 style="text-align: center; color: #667eea;">🏆 FIN DEL JUEGO</h2>
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; border-radius: 15px; text-align: center; margin: 30px 0;">
+                            <h1 style="font-size: 48px; margin: 0;">¡ALDEANOS GANAN!</h1>
+                            <p style="margin-top: 20px;">Todos los lobos han sido eliminados</p>
+                        </div>
+                    `;
+                    return;
+                }
+                if (lobos.length >= aldeanos.length) {
+                    gameContent.innerHTML = `
+                        <h2 style="text-align: center; color: #667eea;">🏆 FIN DEL JUEGO</h2>
+                        <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: #333; padding: 40px; border-radius: 15px; text-align: center; margin: 30px 0;">
+                            <h1 style="font-size: 48px; margin: 0;">¡LOBOS GANAN!</h1>
+                            <p style="margin-top: 20px;">Los lobos han igualado o superado a los aldeanos</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                if (isModerator) {
+                    // Vista del moderador
+                    let html = `
+                        <h2 style="text-align: center; color: #667eea; margin-bottom: 10px;">🐺 El Lobo</h2>
+                        <div style="background: #ffc107; color: #333; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 15px;">
+                            <strong>🎭 MODERADOR</strong><br>
+                            Fase: ${room.phase === 'night' ? '🌙 NOCHE' : '☀️ DÍA ' + room.dayCount}
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <h3>Jugadores vivos (${alivePlayers.length}):</h3>
+                    `;
+
+                    Object.keys(room.players).forEach(p => {
+                        const player = room.players[p];
+                        if (player.role === 'moderador') return;
+                        
+                        const roleIcon = player.role === 'lobo' ? '🐺' : '👥';
+                        const status = player.alive ? '✅' : '❌';
+                        
+                        html += `
+                            <div style="background: ${player.alive ? '#e7f3ff' : '#f8f9fa'}; padding: 12px; border-radius: 8px; margin: 5px 0; border-left: 4px solid ${player.role === 'lobo' ? '#dc3545' : '#667eea'}; opacity: ${player.alive ? 1 : 0.5};">
+                                ${status} <strong>${p}</strong> - ${roleIcon} ${player.role.toUpperCase()}
+                            </div>
+                        `;
+                    });
+
+                    html += '</div>';
+
+                    if (room.phase === 'night') {
+                        html += `
+                            <div class="info">
+                                🌙 Los lobos eligen a quién eliminar. Confirma la víctima:
+                            </div>
+                            <select id="nightVictimSelect" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px; border: 2px solid #667eea;">
+                                <option value="">Seleccionar víctima...</option>
+                                ${aldeanos.map(p => `<option value="${p}">${p}</option>`).join('')}
+                            </select>
+                            <div class="btn" onclick="confirmNightKill('${roomCode}')">✅ Confirmar Muerte Nocturna</div>
+                        `;
+                    } else {
+                        html += `
+                            <div class="info">
+                                ☀️ Los jugadores votan a quién eliminar. Confirma los votos:
+                            </div>
+                        `;
+
+                        if (Object.keys(room.dayVotes || {}).length > 0) {
+                            html += '<h3>Votos actuales:</h3><div style="margin: 10px 0;">';
+                            Object.entries(room.dayVotes).forEach(([voter, target]) => {
+                                html += `<div style="padding: 8px; background: #f8f9fa; border-radius: 5px; margin: 5px 0;"><strong>${voter}</strong> → ${target}</div>`;
+                            });
+                            html += '</div>';
+                        }
+
+                        html += `
+                            <select id="dayVictimSelect" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px; border: 2px solid #667eea;">
+                                <option value="">Seleccionar eliminado...</option>
+                                ${alivePlayers.map(p => `<option value="${p}">${p}</option>`).join('')}
+                            </select>
+                            <div class="btn" onclick="confirmDayElimination('${roomCode}')">✅ Confirmar Eliminación del Día</div>
+                        `;
+                    }
+
+                    gameContent.innerHTML = html;
+                } else {
+                    // Vista de jugador normal
+                    const lobosNames = Object.keys(room.players).filter(p => room.players[p].role === 'lobo').join(', ');
+                    const isWolf = player.role === 'lobo';
+
+                    let html = `
+                        <h2 style="text-align: center; color: #667eea; margin-bottom: 10px;">🐺 El Lobo</h2>
+                        <div style="background: ${isWolf ? 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}; color: ${isWolf ? '#333' : 'white'}; padding: 30px; border-radius: 15px; text-align: center; margin-bottom: 15px;">
+                            <h2 style="font-size: 28px; margin-bottom: 10px;">${isWolf ? '🐺 Eres un LOBO' : '👥 Eres un ALDEANO'}</h2>
+                            ${isWolf ? `<p><strong>Otros lobos:</strong> ${lobosNames}</p>` : '<p>Debes encontrar y eliminar a los lobos</p>'}
+                            ${player.alive ? '' : '<p style="margin-top: 15px; font-weight: bold;">❌ ESTÁS ELIMINADO</p>'}
+                        </div>
+                        <div style="background: ${room.phase === 'night' ? '#2c3e50' : '#fffbea'}; color: ${room.phase === 'night' ? 'white' : '#333'}; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 15px;">
+                            <strong>Fase actual:</strong> ${room.phase === 'night' ? '🌙 NOCHE' : '☀️ DÍA ' + room.dayCount}
+                        </div>
+                        <h3>Jugadores vivos:</h3>
+                        <div style="margin-bottom: 15px;">
+                    `;
+
+                    alivePlayers.forEach(p => {
+                        html += `<div style="background: #e7f3ff; padding: 10px; border-radius: 8px; margin: 5px 0;">✅ ${p}</div>`;
+                    });
+
+                    html += '</div>';
+
+                    if (player.alive && room.phase === 'day') {
+                        html += `
+                            <h3>Vota para eliminar:</h3>
+                            <select id="voteSelect" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px; border: 2px solid #667eea;">
+                                <option value="">Seleccionar...</option>
+                                ${alivePlayers.filter(p => p !== playerName).map(p => `<option value="${p}">${p}</option>`).join('')}
+                            </select>
+                            <div class="btn" onclick="submitDayVote('${roomCode}', '${playerName}')">🗳️ Enviar Voto</div>
+                        `;
+                    }
+
+                    if (room.phase === 'night') {
+                        html += `<div class="info">🌙 El moderador gestiona la fase de noche. Los lobos discuten en privado.</div>`;
+                    } else {
+                        html += `<div class="info">☀️ Discutan y voten a quién creen que es un lobo.</div>`;
+                    }
+
+                    gameContent.innerHTML = html;
+                }
+            });
+
+            showScreen('gameScreen');
+        }
+
+        async function confirmNightKill(roomCode) {
+            const victim = document.getElementById('nightVictimSelect').value;
+            if (!victim) {
+                alert('Selecciona una víctima');
+                return;
+            }
+
+            await database.ref(`rooms/${roomCode}`).update({
+                [`players/${victim}/alive`]: false,
+                phase: 'day',
+                nightVictim: victim,
+                dayVotes: {}
+            });
+        }
+
+        async function confirmDayElimination(roomCode) {
+            const victim = document.getElementById('dayVictimSelect').value;
+            if (!victim) {
+                alert('Selecciona un eliminado');
+                return;
+            }
+
+            const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+            const room = snapshot.val();
+
+            await database.ref(`rooms/${roomCode}`).update({
+                [`players/${victim}/alive`]: false,
+                phase: 'night',
+                dayCount: room.dayCount + 1,
+                dayVotes: {}
+            });
+        }
+
+        async function submitDayVote(roomCode, playerName) {
+            const vote = document.getElementById('voteSelect').value;
+            if (!vote) {
+                alert('Selecciona un jugador');
+                return;
+            }
+
+            await database.ref(`rooms/${roomCode}/dayVotes/${playerName}`).set(vote);
+            alert('Voto enviado al moderador');
         }
 
         // Quick Stop
