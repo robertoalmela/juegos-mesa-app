@@ -31,13 +31,13 @@ function createLoveLetterDeck() {
 async function startLoveLetterRound(roomCode) {
     const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
     const room = snapshot.val();
-    
+
     // Crear y barajar mazo
     const deck = createLoveLetterDeck();
-    
+
     // Remover 1 carta (sin revelar)
     const removedCard = deck.pop();
-    
+
     // Repartir 1 carta a cada jugador
     const players = room.playerOrder;
     players.forEach((playerName) => {
@@ -48,7 +48,7 @@ async function startLoveLetterRound(roomCode) {
             protected: false
         });
     });
-    
+
     // Actualizar sala
     await database.ref(`rooms/${roomCode}`).update({
         deck: deck,
@@ -63,20 +63,20 @@ async function startLoveLetterRound(roomCode) {
 // Jugar Love Letter
 function playLoveLetter(roomCode, playerName) {
     const gameContent = document.getElementById('gameContent');
-    
+
     roomRef.on('value', (snapshot) => {
         const room = snapshot.val();
         if (!room) return;
-        
+
         const player = room.players[playerName];
         if (!player) {
             gameContent.innerHTML = '<p style="color: red;">No estás en esta partida.</p>';
             return;
         }
-        
+
         const currentPlayer = room.playerOrder[room.currentTurnIndex];
         const isMyTurn = currentPlayer === playerName;
-        
+
         // Comprobar si alguien ganó la partida completa
         const winner = Object.keys(room.players).find(p => room.players[p].score >= room.pointsToWin);
         if (winner) {
@@ -90,7 +90,7 @@ function playLoveLetter(roomCode, playerName) {
             `;
             return;
         }
-        
+
         // Pantalla de inicio de ronda
         if (!room.roundInProgress) {
             let html = `
@@ -98,15 +98,15 @@ function playLoveLetter(roomCode, playerName) {
                 ${renderScoreboard(room)}
                 <div style="text-align: center; margin: 30px 0;">
                     <p>Puntos para ganar: ${room.pointsToWin}</p>
-                    ${room.playerOrder[0] === playerName ? 
-                        '<div class="btn" onclick="startLoveLetterRound(\'' + roomCode + '\')">Iniciar Ronda</div>' :
-                        '<p style="color: #666;">Esperando que el primer jugador inicie la ronda...</p>'}
+                    ${room.playerOrder[0] === playerName ?
+                    '<div class="btn" onclick="startLoveLetterRound(\'' + roomCode + '\')">Iniciar Ronda</div>' :
+                    '<p style="color: #666;">Esperando que el primer jugador inicie la ronda...</p>'}
                 </div>
             `;
             gameContent.innerHTML = html;
             return;
         }
-        
+
         // Comprobar fin de ronda
         const activePlayers = room.playerOrder.filter(p => !room.players[p].eliminated);
         if (activePlayers.length === 1) {
@@ -119,18 +119,18 @@ function playLoveLetter(roomCode, playerName) {
                     <p>Era el último jugador en pie</p>
                 </div>
                 ${renderScoreboard(room)}
-                ${playerName === room.playerOrder[0] ? 
+                ${playerName === room.playerOrder[0] ?
                     '<div class="btn" onclick="endLoveLetterRound(\'' + roomCode + '\', \'' + roundWinner + '\')">Continuar a Siguiente Ronda</div>' :
                     '<p style="text-align: center; color: #666;">Esperando que el primer jugador continúe...</p>'}
             `;
             return;
         }
-        
+
         if (room.deck.length === 0) {
             // Se acabó el mazo - gana el jugador con la carta más alta
             let highestValue = 0;
             let roundWinner = null;
-            
+
             activePlayers.forEach(p => {
                 const cardValue = room.players[p].hand[0].value;
                 if (cardValue > highestValue) {
@@ -138,7 +138,7 @@ function playLoveLetter(roomCode, playerName) {
                     roundWinner = p;
                 }
             });
-            
+
             gameContent.innerHTML = `
                 <h2 style="text-align: center; color: #667eea;">💌 Fin de Ronda ${room.currentRound}</h2>
                 <div style="background: #fffbea; border: 3px solid #ffd700; padding: 30px; border-radius: 15px; text-align: center; margin: 20px 0;">
@@ -148,18 +148,18 @@ function playLoveLetter(roomCode, playerName) {
                 <h3 style="margin-top: 20px;">Cartas finales:</h3>
                 <div class="player-list">
                     ${activePlayers.map(p => {
-                        const card = room.players[p].hand[0];
-                        return `<div class="player-item">${p}: ${card.name} (${card.value})</div>`;
-                    }).join('')}
+                const card = room.players[p].hand[0];
+                return `<div class="player-item">${p}: ${card.name} (${card.value})</div>`;
+            }).join('')}
                 </div>
                 ${renderScoreboard(room)}
-                ${playerName === room.playerOrder[0] ? 
+                ${playerName === room.playerOrder[0] ?
                     '<div class="btn" onclick="endLoveLetterRound(\'' + roomCode + '\', \'' + roundWinner + '\')">Continuar a Siguiente Ronda</div>' :
                     '<p style="text-align: center; color: #666;">Esperando que el primer jugador continúe...</p>'}
             `;
             return;
         }
-        
+
         // Pantalla de juego normal
         let html = `
             <h2 style="text-align: center; color: #667eea;">💌 Love Letter - Ronda ${room.currentRound}</h2>
@@ -168,7 +168,7 @@ function playLoveLetter(roomCode, playerName) {
                 <br><small>Cartas en el mazo: ${room.deck.length}</small>
             </div>
         `;
-        
+
         // Mostrar jugadores
         html += '<div class="player-list">';
         room.playerOrder.forEach(p => {
@@ -176,7 +176,7 @@ function playLoveLetter(roomCode, playerName) {
             let className = 'player-item';
             if (pPlayer.eliminated) className += ' eliminated';
             if (p === currentPlayer && !pPlayer.eliminated) className += ' current-turn';
-            
+
             html += `
                 <div class="${className}">
                     <strong>${p}</strong> ${p === playerName ? '(TÚ)' : ''}
@@ -187,7 +187,7 @@ function playLoveLetter(roomCode, playerName) {
             `;
         });
         html += '</div>';
-        
+
         // Mostrar cartas descartadas
         if (room.discardPile.length > 0) {
             html += `
@@ -203,7 +203,7 @@ function playLoveLetter(roomCode, playerName) {
                 </div>
             `;
         }
-        
+
         // Mostrar mi mano
         if (!player.eliminated) {
             html += '<h3 style="margin-top: 20px;">Tu mano:</h3>';
@@ -216,7 +216,7 @@ function playLoveLetter(roomCode, playerName) {
                     </div>
                 `;
             });
-            
+
             if (isMyTurn && !room.waitingForAction) {
                 html += '<div class="btn" onclick="drawLoveLetterCard(\'' + roomCode + '\', \'' + playerName + '\')">Robar Carta</div>';
             } else if (isMyTurn && room.waitingForAction === 'chooseCard') {
@@ -230,21 +230,25 @@ function playLoveLetter(roomCode, playerName) {
                 `;
             }
         }
-        
+
         gameContent.innerHTML = html;
     });
-    
+
     showScreen('gameScreen');
 }
 
 function renderScoreboard(room) {
     let html = '<div style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin: 15px 0;"><h3 style="margin-bottom: 10px;">Puntuación:</h3>';
-    room.playerOrder.forEach(p => {
-        html += `<div style="display: flex; justify-content: space-between; padding: 5px 0;">
-            <span>${p}</span>
-            <span style="font-weight: bold;">${room.players[p].score} puntos</span>
-        </div>`;
-    });
+
+    if (room.playerOrder && Array.isArray(room.playerOrder)) {
+        room.playerOrder.forEach(p => {
+            html += `<div style="display: flex; justify-content: space-between; padding: 5px 0;">
+                <span>${p}</span>
+                <span style="font-weight: bold;">${room.players[p].score} puntos</span>
+            </div>`;
+        });
+    }
+
     html += '</div>';
     return html;
 }
@@ -253,19 +257,19 @@ function renderScoreboard(room) {
 async function drawLoveLetterCard(roomCode, playerName) {
     const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
     const room = snapshot.val();
-    
+
     if (room.deck.length === 0) {
         alert('No quedan cartas en el mazo');
         return;
     }
-    
+
     const card = room.deck[room.deck.length - 1];
     const newDeck = room.deck.slice(0, -1);
-    
+
     // Añadir carta a la mano del jugador
     const playerHand = room.players[playerName].hand;
     playerHand.push(card);
-    
+
     await database.ref(`rooms/${roomCode}`).update({
         deck: newDeck,
         [`players/${playerName}/hand`]: playerHand,
@@ -277,10 +281,10 @@ async function drawLoveLetterCard(roomCode, playerName) {
 async function playLoveLetterCard(roomCode, playerName, cardIndex) {
     const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
     const room = snapshot.val();
-    
+
     const player = room.players[playerName];
     const card = player.hand[cardIndex];
-    
+
     // Verificar si debe jugar Condesa
     if (player.hand.some(c => c.value === 7)) {
         const otherCard = player.hand.find(c => c.value !== 7);
@@ -291,24 +295,24 @@ async function playLoveLetterCard(roomCode, playerName, cardIndex) {
             }
         }
     }
-    
+
     // Remover carta de la mano
     const newHand = player.hand.filter((_, i) => i !== cardIndex);
-    
+
     // Añadir carta al descarte
     const newDiscardPile = [...room.discardPile, card];
-    
+
     // Remover protección de todos los jugadores
     const updates = {
         [`players/${playerName}/hand`]: newHand,
         discardPile: newDiscardPile,
         waitingForAction: null
     };
-    
+
     room.playerOrder.forEach(p => {
         updates[`players/${p}/protected`] = false;
     });
-    
+
     // Aplicar efecto de la carta
     await applyLoveLetterCardEffect(roomCode, playerName, card, room, updates);
 }
@@ -339,7 +343,7 @@ async function applyLoveLetterCardEffect(roomCode, playerName, card, room, updat
                 }
             }
             break;
-            
+
         case 2: // Sacerdote
             const priestTarget = prompt('Elige un jugador para ver su carta (nombre exacto):');
             if (priestTarget && room.players[priestTarget] && !room.players[priestTarget].eliminated) {
@@ -351,7 +355,7 @@ async function applyLoveLetterCardEffect(roomCode, playerName, card, room, updat
                 }
             }
             break;
-            
+
         case 3: // Barón
             const baronTarget = prompt('Elige un jugador para comparar manos (nombre exacto):');
             if (baronTarget && room.players[baronTarget] && !room.players[baronTarget].eliminated && baronTarget !== playerName) {
@@ -360,7 +364,7 @@ async function applyLoveLetterCardEffect(roomCode, playerName, card, room, updat
                 } else {
                     const myCard = room.players[playerName].hand[0];
                     const theirCard = room.players[baronTarget].hand[0];
-                    
+
                     if (myCard.value > theirCard.value) {
                         updates[`players/${baronTarget}/eliminated`] = true;
                         updates.discardPile = [...updates.discardPile, theirCard];
@@ -377,11 +381,11 @@ async function applyLoveLetterCardEffect(roomCode, playerName, card, room, updat
                 }
             }
             break;
-            
+
         case 4: // Doncella
             updates[`players/${playerName}/protected`] = true;
             break;
-            
+
         case 5: // Príncipe
             const princeTarget = prompt('Elige un jugador que descarte y robe (nombre exacto, o tu propio nombre):');
             if (princeTarget && room.players[princeTarget] && !room.players[princeTarget].eliminated) {
@@ -390,7 +394,7 @@ async function applyLoveLetterCardEffect(roomCode, playerName, card, room, updat
                 } else {
                     const discardedCard = room.players[princeTarget].hand[0];
                     updates.discardPile = [...updates.discardPile, discardedCard];
-                    
+
                     if (discardedCard.value === 8) {
                         // Princesa - eliminado
                         updates[`players/${princeTarget}/eliminated`] = true;
@@ -410,7 +414,7 @@ async function applyLoveLetterCardEffect(roomCode, playerName, card, room, updat
                 }
             }
             break;
-            
+
         case 6: // Rey
             const kingTarget = prompt('Elige un jugador para intercambiar manos (nombre exacto):');
             if (kingTarget && room.players[kingTarget] && !room.players[kingTarget].eliminated && kingTarget !== playerName) {
@@ -419,33 +423,33 @@ async function applyLoveLetterCardEffect(roomCode, playerName, card, room, updat
                 } else {
                     const myCard = room.players[playerName].hand[0];
                     const theirCard = room.players[kingTarget].hand[0];
-                    
+
                     updates[`players/${playerName}/hand`] = [theirCard];
                     updates[`players/${kingTarget}/hand`] = [myCard];
                     alert(`Intercambiaste cartas con ${kingTarget}`);
                 }
             }
             break;
-            
+
         case 7: // Condesa
             // No hace nada
             break;
-            
+
         case 8: // Princesa
             updates[`players/${playerName}/eliminated`] = true;
             updates[`players/${playerName}/hand`] = [];
             alert('Jugaste la Princesa. Quedas eliminado.');
             break;
     }
-    
+
     // Avanzar al siguiente turno
     let nextTurnIndex = (room.currentTurnIndex + 1) % room.playerOrder.length;
     while (room.players[room.playerOrder[nextTurnIndex]].eliminated) {
         nextTurnIndex = (nextTurnIndex + 1) % room.playerOrder.length;
     }
-    
+
     updates.currentTurnIndex = nextTurnIndex;
-    
+
     await database.ref(`rooms/${roomCode}`).update(updates);
 }
 
@@ -453,9 +457,9 @@ async function applyLoveLetterCardEffect(roomCode, playerName, card, room, updat
 async function endLoveLetterRound(roomCode, winnerName) {
     const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
     const room = snapshot.val();
-    
+
     const newScore = room.players[winnerName].score + 1;
-    
+
     await database.ref(`rooms/${roomCode}`).update({
         [`players/${winnerName}/score`]: newScore,
         currentRound: room.currentRound + 1,

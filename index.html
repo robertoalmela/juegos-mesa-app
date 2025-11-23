@@ -49,355 +49,355 @@
             color: #667eea;
             margin-bottom: 10px;
             font-size: 28px;
-text-align: center;
-}
+            text-align: center;
+        }
 
-.subtitle {
-text-align: center;
-color: #666;
-margin-bottom: 30px;
-font-size: 14px;
-}
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
 
-.screen {
-display: none;
-}
+        .screen {
+            display: none;
+        }
 
-.screen.active {
-display: block;
-animation: fadeIn 0.3s ease-in;
-}
+        .screen.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
 
-@keyframes fadeIn {
-from {
-opacity: 0;
-transform: translateY(10px);
-}
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
 
-to {
-opacity: 1;
-transform: translateY(0);
-}
-}
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
 
-.game-select {
-display: grid;
-gap: 15px;
-margin-bottom: 20px;
-}
+        .game-select {
+            display: grid;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
 
-.game-card {
-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-color: white;
-padding: 20px;
-border-radius: 15px;
-cursor: pointer;
-transition: transform 0.2s, box-shadow 0.2s;
-border: 3px solid transparent;
-}
+        .game-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 3px solid transparent;
+        }
 
-.game-card:hover {
-transform: translateY(-5px);
-box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
-}
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
 
-.game-card.selected {
-border-color: #ffd700;
-box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
-}
+        .game-card.selected {
+            border-color: #ffd700;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
 
-.game-card h3 {
-margin-bottom: 8px;
-font-size: 20px;
-}
+        .game-card h3 {
+            margin-bottom: 8px;
+            font-size: 20px;
+        }
 
-.game-card p {
-font-size: 14px;
-opacity: 0.9;
-}
+        .game-card p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
 
-label {
-display: block;
-margin-top: 20px;
-margin-bottom: 8px;
-color: #333;
-font-weight: 600;
-}
+        label {
+            display: block;
+            margin-top: 20px;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
 
-input,
-textarea {
-width: 100%;
-padding: 12px;
-border: 2px solid #e0e0e0;
-border-radius: 10px;
-font-size: 16px;
-transition: border-color 0.3s;
-}
+        input,
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
 
-input:focus,
-textarea:focus {
-outline: none;
-border-color: #667eea;
-}
+        input:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
 
-input:disabled {
-background: #f0f0f0;
-cursor: not-allowed;
-}
+        input:disabled {
+            background: #f0f0f0;
+            cursor: not-allowed;
+        }
 
-textarea {
-resize: vertical;
-min-height: 80px;
-font-family: inherit;
-}
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+            font-family: inherit;
+        }
 
-.btn {
-width: 100%;
-padding: 15px;
-margin-top: 20px;
-background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-color: white;
-border: none;
-border-radius: 10px;
-font-size: 18px;
-font-weight: 600;
-cursor: pointer;
-transition: transform 0.2s, box-shadow 0.2s;
-}
+        .btn {
+            width: 100%;
+            padding: 15px;
+            margin-top: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
 
-.btn:hover {
-transform: translateY(-2px);
-box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
-}
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
 
-.btn:active {
-transform: translateY(0);
-}
+        .btn:active {
+            transform: translateY(0);
+        }
 
-.btn-secondary {
-background: #6c757d;
-margin-top: 10px;
-}
+        .btn-secondary {
+            background: #6c757d;
+            margin-top: 10px;
+        }
 
-.code-display {
-background: #f8f9fa;
-border: 3px dashed #667eea;
-padding: 30px;
-border-radius: 15px;
-text-align: center;
-margin: 20px 0;
-}
+        .code-display {
+            background: #f8f9fa;
+            border: 3px dashed #667eea;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            margin: 20px 0;
+        }
 
-.code-display .code {
-font-size: 48px;
-font-weight: bold;
-color: #667eea;
-letter-spacing: 8px;
-font-family: 'Courier New', monospace;
-}
+        .code-display .code {
+            font-size: 48px;
+            font-weight: bold;
+            color: #667eea;
+            letter-spacing: 8px;
+            font-family: 'Courier New', monospace;
+        }
 
-.code-display p {
-margin-top: 15px;
-color: #666;
-font-size: 14px;
-}
+        .code-display p {
+            margin-top: 15px;
+            color: #666;
+            font-size: 14px;
+        }
 
-.info {
-background: #d1ecf1;
-border-left: 4px solid #17a2b8;
-padding: 15px;
-border-radius: 8px;
-margin: 15px 0;
-color: #0c5460;
-font-size: 14px;
-}
+        .info {
+            background: #d1ecf1;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            color: #0c5460;
+            font-size: 14px;
+        }
 
-.warning {
-background: #fff3cd;
-border-left: 4px solid #ffc107;
-padding: 15px;
-border-radius: 8px;
-margin: 15px 0;
-color: #856404;
-}
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            color: #856404;
+        }
 
-.hidden {
-display: none !important;
-}
+        .hidden {
+            display: none !important;
+        }
 
-.game-board {
-display: grid;
-grid-template-columns: repeat(5, 1fr);
-gap: 8px;
-margin: 20px 0;
-}
+        .game-board {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+            margin: 20px 0;
+        }
 
-.board-card {
-padding: 12px;
-border-radius: 8px;
-text-align: center;
-min-height: 50px;
-display: flex;
-align-items: center;
-justify-content: center;
-border: 2px solid #e0e0e0;
-font-weight: bold;
-font-size: 13px;
-word-break: break-word;
-}
+        .board-card {
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            min-height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid #e0e0e0;
+            font-weight: bold;
+            font-size: 13px;
+            word-break: break-word;
+        }
 
-@media (max-width: 480px) {
-.container {
-padding: 15px;
-max-width: 100%;
-}
+        @media (max-width: 480px) {
+            .container {
+                padding: 15px;
+                max-width: 100%;
+            }
 
-h1 {
-font-size: 22px;
-}
+            h1 {
+                font-size: 22px;
+            }
 
-.code-display .code {
-font-size: 36px;
-letter-spacing: 4px;
-}
+            .code-display .code {
+                font-size: 36px;
+                letter-spacing: 4px;
+            }
 
-.game-board {
-gap: 5px;
-}
+            .game-board {
+                gap: 5px;
+            }
 
-.board-card {
-padding: 8px;
-min-height: 45px;
-font-size: 11px;
-}
-}
+            .board-card {
+                padding: 8px;
+                min-height: 45px;
+                font-size: 11px;
+            }
+        }
 
-/* Nuevos Estilos Visuales */
-.spyfall-location {
-background: #2d3748;
-color: white;
-padding: 5px 10px;
-border-radius: 15px;
-margin: 2px;
-display: inline-block;
-font-size: 0.9em;
-}
+        /* Nuevos Estilos Visuales */
+        .spyfall-location {
+            background: #2d3748;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 15px;
+            margin: 2px;
+            display: inline-block;
+            font-size: 0.9em;
+        }
 
-.conexion-card {
-width: 60px;
-height: 90px;
-border-radius: 8px;
-display: flex;
-align-items: center;
-justify-content: center;
-font-weight: bold;
-font-size: 24px;
-background: white;
-box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-border: 2px solid #667eea;
-cursor: pointer;
-transition: transform 0.2s;
-}
+        .conexion-card {
+            width: 60px;
+            height: 90px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 24px;
+            background: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: 2px solid #667eea;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
 
-.conexion-card:hover {
-transform: translateY(-5px);
-}
+        .conexion-card:hover {
+            transform: translateY(-5px);
+        }
 
-.codenames-grid {
-display: grid;
-grid-template-columns: repeat(5, 1fr);
-gap: 10px;
-margin: 20px 0;
-}
+        .codenames-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin: 20px 0;
+        }
 
-.codenames-card {
-aspect-ratio: 4/3;
-display: flex;
-align-items: center;
-justify-content: center;
-text-align: center;
-padding: 5px;
-border-radius: 8px;
-font-weight: bold;
-font-size: 0.9em;
-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-transition: all 0.3s ease;
-position: relative;
-overflow: hidden;
-background: white;
-border: 2px solid #e2e8f0;
-color: #2d3748;
-}
+        .codenames-card {
+            aspect-ratio: 4/3;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 5px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 0.9em;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            background: white;
+            border: 2px solid #e2e8f0;
+            color: #2d3748;
+        }
 
-.codenames-card.revealed {
-color: white;
-border: none;
-}
+        .codenames-card.revealed {
+            color: white;
+            border: none;
+        }
 
-.codenames-card.rojo {
-background: #fc8181;
-}
+        .codenames-card.rojo {
+            background: #fc8181;
+        }
 
-.codenames-card.azul {
-background: #63b3ed;
-}
+        .codenames-card.azul {
+            background: #63b3ed;
+        }
 
-.codenames-card.inocente {
-background: #cbd5e0;
-color: #4a5568;
-}
+        .codenames-card.inocente {
+            background: #cbd5e0;
+            color: #4a5568;
+        }
 
-.codenames-card.asesino {
-background: #1a202c;
-color: white;
-}
+        .codenames-card.asesino {
+            background: #1a202c;
+            color: white;
+        }
 
-.love-letter-card {
-background: white;
-border: 1px solid #e2e8f0;
-border-radius: 12px;
-padding: 15px;
-margin: 10px 0;
-box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-position: relative;
-overflow: hidden;
-}
+        .love-letter-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 10px 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            position: relative;
+            overflow: hidden;
+        }
 
-.love-letter-card::before {
-content: '';
-position: absolute;
-top: 0;
-left: 0;
-width: 100%;
-height: 5px;
-background: linear-gradient(90deg, #667eea, #764ba2);
-}
+        .love-letter-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+        }
 
-.card-number {
-font-size: 2em;
-font-weight: 900;
-color: #e2e8f0;
-position: absolute;
-top: 10px;
-right: 15px;
-line-height: 1;
-}
+        .card-number {
+            font-size: 2em;
+            font-weight: 900;
+            color: #e2e8f0;
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            line-height: 1;
+        }
 
-.card-name {
-font-size: 1.2em;
-font-weight: bold;
-color: #2d3748;
-margin-bottom: 5px;
-position: relative;
-}
+        .card-name {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 5px;
+            position: relative;
+        }
 
-.card-effect {
-font-size: 0.9em;
-color: #718096;
-line-height: 1.4;
-position: relative;
-}
-</style>
+        .card-effect {
+            font-size: 0.9em;
+            color: #718096;
+            line-height: 1.4;
+            position: relative;
+        }
+    </style>
 </head>
 
 <body>
@@ -556,7 +556,6 @@ position: relative;
         </div>
     </div>
 
-    <script src="firebase-config.js"></script>
     <script>
         let selectedGame = null;
         let currentRoom = null;
