@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Firebase</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .status {
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            background: #007bff;
+            color: white;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        #log {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔥 Test de Firebase</h1>
+
+    <div id="status" class="status info">Cargando Firebase...</div>
+
+    <div>
+        <button onclick="testWrite()">✍️ Escribir en Firebase</button>
+        <button onclick="testRead()">📖 Leer de Firebase</button>
+        <button onclick="testDelete()">🗑️ Eliminar Test</button>
+    </div>
+
+    <div id="log"></div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <!-- Configuración -->
+    <script src="firebase-config.js"></script>
+
+    <script>
+        const statusDiv = document.getElementById('status');
+        const logDiv = document.getElementById('log');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const color = type === 'error' ? 'red' : type === 'success' ? 'green' : 'blue';
+            logDiv.innerHTML += `<div style="color: ${color}; margin: 5px 0;">[${timestamp}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        // Verificar que Firebase se inicializó
+        try {
+            if (firebase.apps.length > 0) {
+                statusDiv.className = 'status success';
+                statusDiv.textContent = '✅ Firebase inicializado correctamente';
+                log('Firebase inicializado correctamente', 'success');
+                log(`Database URL: ${firebase.app().options.databaseURL}`, 'info');
+            } else {
+                throw new Error('Firebase no se inicializó');
+            }
+        } catch (error) {
+            statusDiv.className = 'status error';
+            statusDiv.textContent = '❌ Error: ' + error.message;
+            log('Error al inicializar Firebase: ' + error.message, 'error');
+        }
+
+        async function testWrite() {
+            try {
+                log('Escribiendo datos de prueba...', 'info');
+                const testRef = database.ref('test/mensaje');
+                await testRef.set({
+                    texto: 'Hola desde Firebase!',
+                    timestamp: Date.now()
+                });
+                log('✅ Datos escritos correctamente', 'success');
+            } catch (error) {
+                log('❌ Error al escribir: ' + error.message, 'error');
+            }
+        }
+
+        async function testRead() {
+            try {
+                log('Leyendo datos...', 'info');
+                const testRef = database.ref('test/mensaje');
+                const snapshot = await testRef.once('value');
+                const data = snapshot.val();
+
+                if (data) {
+                    log('✅ Datos leídos: ' + JSON.stringify(data, null, 2), 'success');
+                } else {
+                    log('⚠️ No hay datos. Prueba escribir primero.', 'info');
+                }
+            } catch (error) {
+                log('❌ Error al leer: ' + error.message, 'error');
+            }
+        }
+
+        async function testDelete() {
+            try {
+                log('Eliminando datos de prueba...', 'info');
+                const testRef = database.ref('test');
+                await testRef.remove();
+                log('✅ Datos eliminados correctamente', 'success');
+            } catch (error) {
+                log('❌ Error al eliminar: ' + error.message, 'error');
+            }
+        }
+
+        // Test de conexión en tiempo real
+        const connectedRef = database.ref('.info/connected');
+        connectedRef.on('value', (snapshot) => {
+            if (snapshot.val() === true) {
+                log('🟢 Conectado a Firebase en tiempo real', 'success');
+            } else {
+                log('🔴 Desconectado de Firebase', 'error');
+            }
+        });
+    </script>
+</body>
+
+</html>
