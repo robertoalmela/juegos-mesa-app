@@ -18,6 +18,7 @@
     <script src="new-games.js"></script>
     <script src="loveletter-implementation.js"></script>
     <script src="conexion-implementation.js"></script>
+    <script src="ux-improvements.js"></script>
 
     <style>
         * {
@@ -462,11 +463,8 @@
 
             <!-- Configuración Blanco -->
             <div id="blancoConfig" class="hidden">
-                <label>Palabra Secreta:</label>
-                <input type="text" id="secretWord" placeholder="Ej: Pizza">
-
                 <div class="info">
-                    💡 Esta palabra la verán todos excepto el jugador "Blanco"
+                    💡 El sistema generará automáticamente una palabra aleatoria de una categoría. Todos verán la categoría, solo el "Blanco" no verá la palabra.
                 </div>
             </div>
 
@@ -512,48 +510,34 @@
             <div class="btn btn-secondary" onclick="showHome()">Volver</div>
         </div>
 
-        <!-- Pantalla: Sala Creada -->
-        <div id="lobbyScreen" class="screen">
-            <h1>✅ Sala Creada</h1>
+        <label>Tu Nombre (para unirte):</label>
+        <input type="text" id="creatorName" placeholder="Tu nombre">
 
-            <div class="code-display">
-                <div class="code" id="roomCode">----</div>
-                <p>Comparte este código con los jugadores</p>
-            </div>
+        <div class="btn" onclick="creatorJoinGame()">Unirme a la Sala</div>
+        <div class="btn btn-secondary" onclick="showHome()">Crear Nueva Sala</div>
+    </div>
 
-            <div class="info">
-                💡 Ahora puedes unirte a tu propia sala introduciendo tu nombre y el código
-            </div>
+    <!-- Pantalla: Unirse a Sala -->
+    <div id="joinGameScreen" class="screen">
+        <h1>Unirse a Sala</h1>
+        <p class="subtitle">Introduce tus datos</p>
 
-            <label>Tu Nombre (para unirte):</label>
-            <input type="text" id="creatorName" placeholder="Tu nombre">
+        <label>Tu Nombre:</label>
+        <input type="text" id="playerName" placeholder="Tu nombre">
 
-            <div class="btn" onclick="creatorJoinGame()">Unirme a la Sala</div>
-            <div class="btn btn-secondary" onclick="showHome()">Crear Nueva Sala</div>
-        </div>
+        <label>Código de Sala:</label>
+        <input type="text" id="roomCodeInput" placeholder="Ej: A1B2" maxlength="4" style="text-transform: uppercase;">
 
-        <!-- Pantalla: Unirse a Sala -->
-        <div id="joinGameScreen" class="screen">
-            <h1>Unirse a Sala</h1>
-            <p class="subtitle">Introduce tus datos</p>
+        <div class="btn" onclick="joinGame()">Entrar al Juego</div>
+        <div class="btn btn-secondary" onclick="showHome()">Volver</div>
+    </div>
 
-            <label>Tu Nombre:</label>
-            <input type="text" id="playerName" placeholder="Tu nombre">
-
-            <label>Código de Sala:</label>
-            <input type="text" id="roomCodeInput" placeholder="Ej: A1B2" maxlength="4"
-                style="text-transform: uppercase;">
-
-            <div class="btn" onclick="joinGame()">Entrar al Juego</div>
-            <div class="btn btn-secondary" onclick="showHome()">Volver</div>
-        </div>
-
-        <!-- Pantalla: Juego Activo -->
-        <div id="gameScreen" class="screen">
-            <div id="gameHeader"></div>
-            <div id="gameContent"></div>
-            <div class="btn btn-secondary" onclick="showHome()">Salir</div>
-        </div>
+    <!-- Pantalla: Juego Activo -->
+    <div id="gameScreen" class="screen">
+        <div id="gameHeader"></div>
+        <div id="gameContent"></div>
+        <div class="btn btn-secondary" onclick="showHome()">Salir</div>
+    </div>
     </div>
 
     <script>
@@ -575,7 +559,6 @@
                 roomRef = null;
             }
             document.getElementById('playerNames').value = '';
-            document.getElementById('secretWord').value = '';
             document.getElementById('playerName').value = '';
             document.getElementById('roomCodeInput').value = '';
             document.getElementById('playerNames').disabled = false;
@@ -676,13 +659,7 @@
                 }
             }
 
-            if (selectedGame === 'blanco') {
-                const secretWord = document.getElementById('secretWord').value.trim();
-                if (!secretWord) {
-                    alert('Por favor introduce la palabra secreta');
-                    return;
-                }
-            }
+            // Blanco ya no necesita validación de palabra manual
 
             // Generar código de sala
             const roomCode = generateRoomCode();
@@ -697,7 +674,9 @@
 
             // Configurar según el juego
             if (selectedGame === 'blanco') {
-                room.secretWord = document.getElementById('secretWord').value.trim();
+                const wordData = getRandomBlancoWord();
+                room.secretWord = wordData.word;
+                room.category = wordData.category;
                 const blancoIndex = Math.floor(Math.random() * players.length);
 
                 room.players = {};
@@ -982,6 +961,10 @@
                     gameContent.innerHTML = `
                         <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 40px; border-radius: 15px; text-align: center;">
                             <h2 style="font-size: 32px; margin-bottom: 15px;">¡Eres el BLANCO!</h2>
+                            <div style="background: rgba(255,255,255,0.3); padding: 15px; border-radius: 10px; margin: 15px 0;">
+                                <div style="font-size: 18px; margin-bottom: 5px;">🏷️ Categoría:</div>
+                                <div style="font-size: 28px; font-weight: bold;">${room.category}</div>
+                            </div>
                             <div style="font-size: 40px; font-weight: bold; margin: 20px 0; padding: 20px; background: rgba(255,255,255,0.2); border-radius: 10px;">❓ BLANCO</div>
                             <p>No tienes palabra. Debes adivinar cuál es la palabra secreta sin que te descubran.</p>
                             <p>💡 Disimula y trata de integrarte en la conversación</p>
@@ -990,6 +973,10 @@
                 } else {
                     gameContent.innerHTML = `
                         <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; border-radius: 15px; text-align: center;">
+                            <div style="background: rgba(255,255,255,0.3); padding: 15px; border-radius: 10px; margin-bottom: 15px;">
+                                <div style="font-size: 18px; margin-bottom: 5px;">🏷️ Categoría:</div>
+                                <div style="font-size: 28px; font-weight: bold;">${room.category}</div>
+                            </div>
                             <h2 style="font-size: 32px; margin-bottom: 15px;">Tu Palabra es:</h2>
                             <div style="font-size: 40px; font-weight: bold; margin: 20px 0; padding: 20px; background: rgba(255,255,255,0.2); border-radius: 10px;">${player.word}</div>
                             <p>Hay un jugador que es el BLANCO y no tiene esta palabra.</p>

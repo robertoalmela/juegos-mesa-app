@@ -2,6 +2,30 @@
 // NUEVOS JUEGOS - Lógica y Datos
 // ============================================
 
+// --- DATOS BLANCO - Palabras por Categoría ---
+const BLANCO_WORDS = {
+    'Comida': ['Pizza', 'Hamburguesa', 'Sushi', 'Tacos', 'Paella', 'Pasta', 'Ensalada', 'Helado', 'Chocolate', 'Café', 'Arroz', 'Pan', 'Queso', 'Pollo', 'Carne'],
+    'Lugares': ['Playa', 'Montaña', 'Parque', 'Museo', 'Cine', 'Restaurante', 'Hospital', 'Escuela', 'Biblioteca', 'Gimnasio', 'Aeropuerto', 'Estación', 'Hotel', 'Oficina', 'Mercado'],
+    'Objetos': ['Mesa', 'Silla', 'Teléfono', 'Reloj', 'Libro', 'Lápiz', 'Vaso', 'Plato', 'Almohada', 'Lámpara', 'Espejo', 'Mochila', 'Gafas', 'Llave', 'Botella'],
+    'Deportes': ['Fútbol', 'Baloncesto', 'Tenis', 'Natación', 'Ciclismo', 'Boxeo', 'Golf', 'Voleibol', 'Béisbol', 'Rugby', 'Atletismo', 'Esquí', 'Surf', 'Escalada', 'Yoga'],
+    'Animales': ['Perro', 'Gato', 'León', 'Elefante', 'Delfín', 'Águila', 'Tigre', 'Oso', 'Mono', 'Jirafa', 'Caballo', 'Conejo', 'Pez', 'Serpiente', 'Tortuga'],
+    'Profesiones': ['Médico', 'Profesor', 'Chef', 'Ingeniero', 'Abogado', 'Policía', 'Bombero', 'Artista', 'Músico', 'Piloto', 'Arquitecto', 'Escritor', 'Actor', 'Fotógrafo', 'Dentista'],
+    'Tecnología': ['Computadora', 'Tablet', 'Televisión', 'Radio', 'Cámara', 'Micrófono', 'Auriculares', 'Mouse', 'Teclado', 'Impresora', 'WiFi', 'Bluetooth', 'USB', 'GPS', 'Dron'],
+    'Transportes': ['Coche', 'Autobús', 'Tren', 'Avión', 'Barco', 'Bicicleta', 'Moto', 'Metro', 'Taxi', 'Helicóptero', 'Camión', 'Patinete', 'Tranvía', 'Yate', 'Cohete']
+};
+
+function getRandomBlancoWord() {
+    const categories = Object.keys(BLANCO_WORDS);
+    const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+    const wordsInCategory = BLANCO_WORDS[randomCategory];
+    const randomWord = wordsInCategory[Math.floor(Math.random() * wordsInCategory.length)];
+    
+    return {
+        word: randomWord,
+        category: randomCategory
+    };
+}
+
 // --- DATOS OVER/UNDER ---
 const OVER_UNDER_QUESTIONS = [
     { q: "¿Cuántos huesos tiene el cuerpo humano adulto?", a: 206 },
