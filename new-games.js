@@ -63,6 +63,64 @@ const SPYFALL_LOCATIONS = {
     'Barco Pirata': ['Capitán', 'Loro', 'Cocinero', 'Vigía', 'Prisionero', 'Carpintero', 'Artillero']
 };
 
+// --- DATOS ESPECTRO MENTAL ---
+// Lista de pares de conceptos opuestos para el juego tipo Wavelength
+const ESPECTRO_PARES = [
+    { izquierda: 'Frío', derecha: 'Caliente' },
+    { izquierda: 'Blando', derecha: 'Duro' },
+    { izquierda: 'Ligero', derecha: 'Pesado' },
+    { izquierda: 'Seco', derecha: 'Mojado' },
+    { izquierda: 'Liso', derecha: 'Áspero' },
+    { izquierda: 'Silencioso', derecha: 'Ruidoso' },
+    { izquierda: 'Oscuro', derecha: 'Luminoso' },
+    { izquierda: 'Lento', derecha: 'Rápido' },
+    { izquierda: 'Pequeño', derecha: 'Grande' },
+    { izquierda: 'Barato', derecha: 'Caro' },
+    { izquierda: 'Inútil', derecha: 'Muy útil' },
+    { izquierda: 'Común', derecha: 'Muy raro' },
+    { izquierda: 'Malo', derecha: 'Excelente' },
+    { izquierda: 'Poca calidad', derecha: 'Alta calidad' },
+    { izquierda: 'Prescindible', derecha: 'Imprescindible' },
+    { izquierda: 'Sencillo', derecha: 'Sofisticado' },
+    { izquierda: 'Aburrido', derecha: 'Divertidísimo' },
+    { izquierda: 'Triste', derecha: 'Alegre' },
+    { izquierda: 'Relajante', derecha: 'Estresante' },
+    { izquierda: 'Normal', derecha: 'Muy extraño' },
+    { izquierda: 'Formal', derecha: 'Informal' },
+    { izquierda: 'Anticuado', derecha: 'Moderno' },
+    { izquierda: 'Muy fácil', derecha: 'Muy difícil' },
+    { izquierda: 'Simple', derecha: 'Complejo' },
+    { izquierda: 'Obvio', derecha: 'Confuso' },
+    { izquierda: 'Seguro', derecha: 'Muy arriesgado' },
+    { izquierda: 'Moral', derecha: 'Inmoral' },
+    { izquierda: 'Limpio', derecha: 'Sucio' },
+    { izquierda: 'Ordenado', derecha: 'Caótico' },
+    { izquierda: 'Saludable', derecha: 'Perjudicial' },
+    { izquierda: 'Rural', derecha: 'Urbano' },
+    { izquierda: 'Soso', derecha: 'Apasionante' },
+    { izquierda: 'Típico', derecha: 'Muy original' },
+    { izquierda: 'Introvertido', derecha: 'Extrovertido' },
+    { izquierda: 'Claro', derecha: 'Ambiguo' },
+    { izquierda: 'Previsible', derecha: 'Inesperado' },
+    { izquierda: 'Importancia baja', derecha: 'Importancia enorme' },
+    { izquierda: 'Tranquilo', derecha: 'Peligroso' },
+    { izquierda: 'Privado', derecha: 'Público' },
+    { izquierda: 'Infantil', derecha: 'Muy adulto' }
+];
+
+function getRandomEspectroPar() {
+    const idx = Math.floor(Math.random() * ESPECTRO_PARES.length);
+    return ESPECTRO_PARES[idx];
+}
+
+function getEspectroPuntosPorDistancia(dist) {
+    if (dist <= 5) return 4;
+    if (dist <= 15) return 3;
+    if (dist <= 30) return 2;
+    if (dist <= 50) return 1;
+    return 0;
+}
+
 // --- LÓGICA OVER/UNDER ---
 async function startOverUnderRound(roomCode) {
     const question = OVER_UNDER_QUESTIONS[Math.floor(Math.random() * OVER_UNDER_QUESTIONS.length)];
@@ -282,7 +340,310 @@ async function startSpyfallTimer(roomCode) {
 
 // --- LÓGICA CONEXIÓN MENTAL (THE MIND) ---
 // Conexión Mental (The Mind) implementation removed. 
-// Now using the user's custom implementation in conexion-implementation.js
+// Now usando la implementación personalizada en conexion-implementation.js
+
+// --- LÓGICA ESPECTRO MENTAL ---
+function playEspectroMental(roomCode, playerName) {
+    const gameContent = document.getElementById('gameContent');
+    const gameHeader = document.getElementById('gameHeader');
+
+    gameHeader.innerHTML = renderGameHeader(roomCode, 'espectro');
+
+    roomRef.on('value', (snapshot) => {
+        const room = snapshot.val();
+        if (!room) return;
+
+        const player = room.players && room.players[playerName];
+        if (!player) {
+            gameContent.innerHTML = '<p style="color:red;">No estás registrado en esta partida.</p>';
+            return;
+        }
+
+        const mode = room.gameMode || 'equipos';
+        const totalRounds = room.numRounds || 8;
+        const currentRound = room.currentRound || 1;
+        const phase = room.phase || 'setup';
+        const spectrum = room.currentSpectrum;
+        const secret = room.secretValue;
+        const guideIndex = room.currentGuideIndex || 0;
+        const guideName = room.playerOrder && room.playerOrder[guideIndex];
+
+        // Fin de partida
+        if (phase === 'finished') {
+            let html = `<h2 style="text-align:center; color:#667eea;">🌈 Espectro Mental - Fin de la partida</h2>`;
+
+            if (mode === 'equipos') {
+                html += `<div style="background:#f8f9fa; padding:15px; border-radius:10px; margin:15px 0;">
+                    <h3>Puntuación por equipos</h3>
+                    <div style="display:flex; justify-content:space-between; padding:6px 0;">
+                        <span>Equipo A</span><strong>${room.teamAScore || 0} pts</strong>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; padding:6px 0;">
+                        <span>Equipo B</span><strong>${room.teamBScore || 0} pts</strong>
+                    </div>
+                </div>`;
+            } else if (mode === 'coop') {
+                html += `<div style="background:#f8f9fa; padding:15px; border-radius:10px; margin:15px 0;">
+                    <h3>Puntuación cooperativa</h3>
+                    <p style="font-size:20px; font-weight:bold;">${room.coopScore || 0} puntos</p>
+                </div>`;
+            } else {
+                html += renderScoreboard(room);
+            }
+
+            html += '<p style="text-align:center; color:#666;">Recarga la página para jugar otra partida.</p>';
+            gameContent.innerHTML = html;
+            return;
+        }
+
+        // Fase de preparación de ronda
+        if (phase === 'setup' || !spectrum) {
+            let html = `<h2 style=\"text-align:center; color:#667eea;\">🌈 Espectro Mental - Ronda ${currentRound}/${totalRounds}</h2>`;
+            html += `<div style=\"background:#e7f3ff; padding:20px; border-radius:10px; margin:20px 0; text-align:center;\">
+                <p><strong>Guía de esta ronda:</strong> ${guideName}</p>
+            </div>`;
+
+            if (room.playerOrder && room.playerOrder[0] === playerName) {
+                html += `<div class=\"btn\" onclick=\"startEspectroRound('${roomCode}')\">Iniciar ronda</div>`;
+            } else {
+                html += '<p style="text-align:center; color:#666;">Esperando a que se inicie la ronda...</p>';
+            }
+
+            gameContent.innerHTML = html;
+            return;
+        }
+
+        const myGuess = room.guesses && room.guesses[playerName];
+        const allGuesses = room.guesses || {};
+        const totalPlayers = room.playerOrder ? room.playerOrder.length : Object.keys(room.players).length;
+        const numGuessers = Object.keys(allGuesses).length;
+
+        if (phase === 'guessing') {
+            let html = `<h2 style=\"text-align:center; color:#667eea;\">🌈 Espectro Mental - Ronda ${currentRound}/${totalRounds}</h2>`;
+
+            html += `
+                <div style="background: linear-gradient(90deg, #4299e1, #f56565); padding:20px; border-radius:15px; color:white; margin:20px 0; text-align:center;">
+                    <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:16px;">
+                        <span>${spectrum.izquierda}</span>
+                        <span>${spectrum.derecha}</span>
+                    </div>
+                    <div style="margin-top:10px; font-size:14px; opacity:0.9;">Guía: ${guideName}</div>
+                </div>
+            `;
+
+            if (playerName === guideName) {
+                html += `
+                    <div class="info">
+                        <p><strong>Posición secreta:</strong> ${secret}/100</p>
+                        <p>Da una pista verbal al grupo (fuera de la app). Tus respuestas no se introducen aquí.</p>
+                    </div>
+                `;
+            } else {
+                if (myGuess !== undefined) {
+                    html += `
+                        <div class="info">
+                            <p>Ya has enviado tu estimación: <strong>${myGuess}/100</strong></p>
+                            <p>Esperando al resto de jugadores...</p>
+                        </div>
+                    `;
+                } else {
+                    html += `
+                        <label>Tu estimación en el espectro (1 = ${spectrum.izquierda}, 100 = ${spectrum.derecha}):</label>
+                        <input type="range" id="espectroSlider" min="1" max="100" value="50" oninput="document.getElementById('espectroValue').textContent=this.value" />
+                        <p style="text-align:center; margin-top:10px;">Valor: <strong id="espectroValue">50</strong>/100</p>
+                        <div class="btn" onclick="submitEspectroGuess('${roomCode}', '${playerName}')">Enviar estimación</div>
+                    `;
+                }
+            }
+
+            html += `<p style=\"text-align:center; margin-top:15px; color:#666;\">Estimaciones recibidas: ${numGuessers}/${totalPlayers - 1}</p>`;
+
+            if (numGuessers === totalPlayers - 1 && room.playerOrder && room.playerOrder[0] === playerName) {
+                html += `<div class=\"btn btn-secondary\" onclick=\"revealEspectroRound('${roomCode}')\">Revelar resultado</div>`;
+            }
+
+            gameContent.innerHTML = html;
+            return;
+        }
+
+        if (phase === 'reveal') {
+            let html = `<h2 style=\"text-align:center; color:#667eea;\">🌈 Resultado de la ronda ${currentRound}/${totalRounds}</h2>`;
+
+            html += `
+                <div style="background:white; border:3px solid #667eea; padding:20px; border-radius:15px; margin:20px 0; text-align:center;">
+                    <div style="display:flex; justify-content:space-between; font-weight:bold; font-size:16px; margin-bottom:10px;">
+                        <span>${spectrum.izquierda}</span>
+                        <span>${spectrum.derecha}</span>
+                    </div>
+                    <p>Posición secreta: <strong>${secret}/100</strong></p>
+                </div>
+            `;
+
+            const distances = [];
+            Object.keys(allGuesses).forEach(name => {
+                const guess = allGuesses[name];
+                const dist = Math.abs(secret - guess);
+                distances.push({ name, guess, dist });
+            });
+            distances.sort((a, b) => a.dist - b.dist);
+
+            if (distances.length > 0) {
+                const best = distances[0];
+                html += `<div style=\"background:#e6fffa; padding:15px; border-radius:10px; margin-bottom:15px; text-align:center;\">
+                    <strong>Mejor aproximación:</strong> ${best.name} (${best.guess}/100, distancia ${best.dist})
+                </div>`;
+            }
+
+            html += '<div style="background:#f8f9fa; padding:15px; border-radius:10px;">';
+            html += '<h3 style="margin-bottom:10px;">Distancias:</h3>';
+            distances.forEach(d => {
+                html += `<div style=\"display:flex; justify-content:space-between; padding:4px 0;\">
+                    <span>${d.name}</span>
+                    <span>${d.guess}/100 (distancia ${d.dist})</span>
+                </div>`;
+            });
+            html += '</div>';
+
+            // Mostrar marcadores según modo
+            if (mode === 'equipos') {
+                html += `<div style=\"margin-top:15px;\">
+                    <h3>Puntuación por equipos</h3>
+                    <div style=\"background:#f8f9fa; padding:10px; border-radius:10px;\">
+                        <div style=\"display:flex; justify-content:space-between; padding:6px 0;\"><span>Equipo A</span><strong>${room.teamAScore || 0} pts</strong></div>
+                        <div style=\"display:flex; justify-content:space-between; padding:6px 0;\"><span>Equipo B</span><strong>${room.teamBScore || 0} pts</strong></div>
+                    </div>
+                </div>`;
+            } else if (mode === 'coop') {
+                html += `<div style=\"margin-top:15px;\">
+                    <h3>Puntuación cooperativa</h3>
+                    <p style=\"font-weight:bold; font-size:18px;\">${room.coopScore || 0} puntos</p>
+                </div>`;
+            } else {
+                html += renderScoreboard(room);
+            }
+
+            if (room.playerOrder && room.playerOrder[0] === playerName) {
+                html += `<div class=\"btn\" onclick=\"nextEspectroRound('${roomCode}')\">Siguiente ronda</div>`;
+            } else {
+                html += '<p style="text-align:center; color:#666; margin-top:10px;">Esperando a que el organizador pase a la siguiente ronda...</p>';
+            }
+
+            gameContent.innerHTML = html;
+            return;
+        }
+    });
+
+    showScreen('gameScreen');
+}
+
+async function startEspectroRound(roomCode) {
+    const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+    const room = snapshot.val();
+    if (!room || !room.playerOrder) return;
+
+    const par = getRandomEspectroPar();
+    const secreto = Math.floor(Math.random() * 100) + 1; // 1-100
+
+    await database.ref(`rooms/${roomCode}`).update({
+        currentSpectrum: par,
+        secretValue: secreto,
+        guesses: {},
+        phase: 'guessing'
+    });
+}
+
+async function submitEspectroGuess(roomCode, playerName) {
+    const slider = document.getElementById('espectroSlider');
+    if (!slider) return;
+    const value = parseInt(slider.value, 10) || 50;
+
+    await database.ref(`rooms/${roomCode}/guesses/${playerName}`).set(value);
+}
+
+async function revealEspectroRound(roomCode) {
+    const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+    const room = snapshot.val();
+    if (!room) return;
+
+    const mode = room.gameMode || 'equipos';
+    const secret = room.secretValue;
+    const guesses = room.guesses || {};
+    const updates = { phase: 'reveal' };
+
+    if (mode === 'equipos') {
+        let teamASum = 0, teamACount = 0;
+        let teamBSum = 0, teamBCount = 0;
+
+        Object.keys(guesses).forEach(name => {
+            const guess = guesses[name];
+            const dist = Math.abs(secret - guess);
+            const pts = getEspectroPuntosPorDistancia(dist);
+            const player = room.players[name];
+            if (!player || !player.team) return;
+            if (player.team === 'A') {
+                teamASum += pts;
+                teamACount++;
+            } else {
+                teamBSum += pts;
+                teamBCount++;
+            }
+        });
+
+        const aScore = teamACount ? Math.round(teamASum / teamACount) : 0;
+        const bScore = teamBCount ? Math.round(teamBSum / teamBCount) : 0;
+
+        updates.teamAScore = (room.teamAScore || 0) + aScore;
+        updates.teamBScore = (room.teamBScore || 0) + bScore;
+    } else if (mode === 'coop') {
+        let bestDist = null;
+        Object.keys(guesses).forEach(name => {
+            const guess = guesses[name];
+            const dist = Math.abs(secret - guess);
+            if (bestDist === null || dist < bestDist) bestDist = dist;
+        });
+        const pts = bestDist !== null ? getEspectroPuntosPorDistancia(bestDist) : 0;
+        updates.coopScore = (room.coopScore || 0) + pts;
+    } else {
+        // todos contra todos
+        Object.keys(guesses).forEach(name => {
+            const guess = guesses[name];
+            const dist = Math.abs(secret - guess);
+            const pts = getEspectroPuntosPorDistancia(dist);
+            const current = room.players[name].score || 0;
+            updates[`players/${name}/score`] = current + pts;
+        });
+    }
+
+    await database.ref(`rooms/${roomCode}`).update(updates);
+}
+
+async function nextEspectroRound(roomCode) {
+    const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+    const room = snapshot.val();
+    if (!room || !room.playerOrder) return;
+
+    const totalRounds = room.numRounds || 8;
+    const currentRound = room.currentRound || 1;
+
+    if (currentRound >= totalRounds) {
+        await database.ref(`rooms/${roomCode}`).update({
+            phase: 'finished'
+        });
+        return;
+    }
+
+    let nextGuideIndex = (room.currentGuideIndex || 0) + 1;
+    if (nextGuideIndex >= room.playerOrder.length) nextGuideIndex = 0;
+
+    await database.ref(`rooms/${roomCode}`).update({
+        currentRound: currentRound + 1,
+        currentGuideIndex: nextGuideIndex,
+        currentSpectrum: null,
+        secretValue: null,
+        guesses: {},
+        phase: 'setup'
+    });
+}
 
 function formatTime(seconds) {
     const m = Math.floor(seconds / 60);

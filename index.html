@@ -459,6 +459,11 @@
                     <p>Juego cooperativo. Jugad cartas en orden ascendente SIN HABLAR. ¿Podéis conectar vuestras mentes?
                     </p>
                 </div>
+
+                <div class="game-card" onclick="selectGame('espectro')">
+                    <h3>🌈 Espectro Mental</h3>
+                    <p>Juego social tipo Wavelength: interpreta una pista en un espectro de conceptos opuestos.</p>
+                </div>
             </div>
 
             <!-- Configuración Blanco -->
@@ -496,6 +501,24 @@
                 <div class="info">
                     💡 Time's Up: Divide jugadores en 2 equipos. Los primeros 2 jugadores de la lista serán los
                     representantes (marcan aciertos).
+                </div>
+            </div>
+
+            <!-- Configuración Espectro Mental -->
+            <div id="espectroConfig" class="hidden">
+                <label>Modo de juego:</label>
+                <select id="espectroMode">
+                    <option value="equipos">Por equipos</option>
+                    <option value="individual">Todos contra todos</option>
+                    <option value="coop">Cooperativo</option>
+                </select>
+
+                <label>Número de rondas:</label>
+                <input type="number" id="espectroRounds" value="8" min="3" max="20">
+
+                <div class="info">
+                    💡 Espectro Mental: en cada ronda el sistema elige un par de conceptos opuestos y una posición
+                    secreta. Un jugador da la pista y el resto intenta adivinar con un porcentaje en el espectro.
                 </div>
             </div>
 
@@ -605,6 +628,8 @@
             document.getElementById('quickstopConfig').classList.add('hidden');
             document.getElementById('loveletterConfig').classList.add('hidden');
             document.getElementById('timesupConfig').classList.add('hidden');
+            const espectroCfg = document.getElementById('espectroConfig');
+            if (espectroCfg) espectroCfg.classList.add('hidden');
 
             if (game === 'blanco') {
                 document.getElementById('blancoConfig').classList.remove('hidden');
@@ -614,6 +639,8 @@
                 document.getElementById('loveletterConfig').classList.remove('hidden');
             } else if (game === 'timesup') {
                 document.getElementById('timesupConfig').classList.remove('hidden');
+            } else if (game === 'espectro' && espectroCfg) {
+                espectroCfg.classList.remove('hidden');
             }
             // Nuevos juegos no requieren config extra por ahora
 
@@ -792,6 +819,48 @@
                     };
                 });
 
+            } else if (selectedGame === 'espectro') {
+                const mode = document.getElementById('espectroMode').value || 'equipos';
+                const numRounds = parseInt(document.getElementById('espectroRounds').value) || 8;
+
+                room.gameMode = mode;
+                room.numRounds = numRounds;
+                room.currentRound = 1;
+                room.phase = 'setup';
+                room.currentSpectrum = null;
+                room.secretValue = null;
+                room.guesses = {};
+                room.currentGuideIndex = 0;
+                room.playerOrder = players;
+
+                room.players = {};
+
+                if (mode === 'equipos') {
+                    const half = Math.ceil(players.length / 2);
+                    room.teamAScore = 0;
+                    room.teamBScore = 0;
+                    players.forEach((name, index) => {
+                        room.players[name] = {
+                            team: index < half ? 'A' : 'B',
+                            score: 0
+                        };
+                    });
+                } else if (mode === 'coop') {
+                    room.coopScore = 0;
+                    players.forEach((name) => {
+                        room.players[name] = {
+                            score: 0
+                        };
+                    });
+                } else {
+                    // individual (todos contra todos)
+                    players.forEach((name) => {
+                        room.players[name] = {
+                            score: 0
+                        };
+                    });
+                }
+
             } else if (selectedGame === 'overunder') {
                 room.currentQuestion = null;
                 room.phase = 'waiting';
@@ -930,6 +999,8 @@
                     playSpyfall(roomCode, playerName);
                 } else if (room.game === 'conexion') {
                     playConexionMental(roomCode, playerName);
+                } else if (room.game === 'espectro') {
+                    playEspectroMental(roomCode, playerName);
                 }
             } catch (error) {
                 alert('Error al unirse: ' + error.message);
@@ -989,6 +1060,8 @@
                     playSpyfall(roomCode, playerName);
                 } else if (room.game === 'conexion') {
                     playConexionMental(roomCode, playerName);
+                } else if (room.game === 'espectro') {
+                    playEspectroMental(roomCode, playerName);
                 }
             } catch (error) {
                 alert('Error al unirse: ' + error.message);
@@ -1814,6 +1887,25 @@
                         <li>No seáis muy específicos (el espía escucha) ni muy vagos (pareceréis espías).</li>
                         <li>El espía gana si adivina el lugar o si no es descubierto.</li>
                     </ol>
+            `,
+                espectro: `
+                <h3>🌈 Espectro Mental - Reglas</h3>
+                    <p><strong>Objetivo:</strong> Interpretar una pista y colocar el marcador lo más cerca posible de la posición secreta en un espectro de conceptos opuestos.</p>
+                    <p><strong>Cómo jugar:</strong></p>
+                    <ol>
+                        <li>El sistema elige un par de conceptos opuestos (por ejemplo: "frío – caliente").</li>
+                        <li>El sistema genera una posición secreta del 1 al 100 y solo el Guía la ve.</li>
+                        <li>El Guía da UNA única pista (palabra o concepto) que represente ese punto del espectro.</li>
+                        <li>El resto de jugadores coloca su estimación moviendo el deslizador del 1 al 100.</li>
+                        <li>Cuando todos han enviado su porcentaje, se revela la posición real y quién se ha acercado más.</li>
+                    </ol>
+                    <p><strong>Modos:</strong></p>
+                    <ul>
+                        <li><strong>Por equipos:</strong> se suman puntos al equipo según la distancia media de sus jugadores.</li>
+                        <li><strong>Todos contra todos:</strong> cada jugador gana puntos individualmente según su distancia.</li>
+                        <li><strong>Cooperativo:</strong> el grupo comparte una puntuación total basada en la mejor aproximación de cada ronda.</li>
+                    </ul>
+                    <p>El sistema otorga más puntos cuanto más cerca esté la estimación de la posición secreta.</p>
             `,
                 conexion: `
                 < h3 >🧠 Conexión Mental - Reglas</h3 >

@@ -15,6 +15,7 @@ function initGameSelector() {
             <option value="overunder">📊 Over/Under</option>
             <option value="spyfall">🕵️ Spyfall</option>
             <option value="conexion">🧠 Conexión Mental</option>
+            <option value="espectro">🌈 Espectro Mental</option>
         </select>
 
         <!-- Game Info Display -->
@@ -78,6 +79,11 @@ const GAME_DATA = {
         title: '🧠 Conexión Mental',
         desc: 'Juego cooperativo de palabras. ¡Conectad vuestras mentes!',
         players: '2-6 equipos'
+    },
+    espectro: {
+        title: '🌈 Espectro Mental',
+        desc: 'Juego social tipo Wavelength con espectros de conceptos opuestos.',
+        players: '3-10 jugadores (modo equipos, individual o cooperativo)'
     }
 };
 
@@ -108,6 +114,8 @@ function selectGameFromDropdown(game) {
     document.getElementById('quickstopConfig').classList.add('hidden');
     document.getElementById('loveletterConfig').classList.add('hidden');
     document.getElementById('timesupConfig').classList.add('hidden');
+    const espectroCfg = document.getElementById('espectroConfig');
+    if (espectroCfg) espectroCfg.classList.add('hidden');
 
     if (game === 'blanco') {
         document.getElementById('blancoConfig').classList.remove('hidden');
@@ -117,6 +125,8 @@ function selectGameFromDropdown(game) {
         document.getElementById('loveletterConfig').classList.remove('hidden');
     } else if (game === 'timesup') {
         document.getElementById('timesupConfig').classList.remove('hidden');
+    } else if (game === 'espectro' && espectroCfg) {
+        espectroCfg.classList.remove('hidden');
     }
 
     // Quick Stop no necesita lista de jugadores
@@ -129,6 +139,40 @@ function selectGameFromDropdown(game) {
             document.getElementById('playerNames').value = '';
         }
     }
+}
+
+// Player List Logic
+function updateLobbyPlayerList(players) {
+    const listContainer = document.getElementById('lobbyPlayerList');
+    if (!listContainer) return;
+
+    if (!players || Object.keys(players).length === 0) {
+        listContainer.innerHTML = '<p style="text-align:center; color:#666;">Esperando jugadores...</p>';
+        return;
+    }
+
+    let html = '<h3 style="margin-bottom:10px; font-size:16px;">Jugadores en la sala:</h3>';
+    Object.keys(players).forEach(name => {
+        html += `
+            <div class="player-item" style="display:flex; align-items:center; justify-content:space-between;">
+                <span>👤 ${name}</span>
+                <span style="font-size:12px; color:#666;">Conectado</span>
+            </div>
+        `;
+    });
+    
+    listContainer.innerHTML = html;
+}
+
+// Hook into existing Firebase listener if possible, or set up a new one
+// This function should be called when roomRef is set
+function setupLobbyListener(ref) {
+    ref.on('value', (snapshot) => {
+        const data = snapshot.val();
+        if (data && data.players) {
+            updateLobbyPlayerList(data.players);
+        }
+    });
 }
 
 // Initialize on page load

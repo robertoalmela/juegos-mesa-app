@@ -4,7 +4,7 @@
 
 // Definición de cartas
 const LOVE_LETTER_CARDS = {
-    1: { name: 'Guardia', count: 5, effect: 'Elige un jugador y nombra una carta (excepto Guardia). Si tiene esa carta, queda eliminado.' },
+    1: { name: 'Guardia', count: 5, effect: 'Elige un jugador y nombra una carta (excepto Guardia). Si tiene esa carta, queda eliminado.', image: 'assets/loveletter/guardia.png' },
     2: { name: 'Sacerdote', count: 2, effect: 'Mira la mano de otro jugador.' },
     3: { name: 'Barón', count: 2, effect: 'Compara tu mano con otro jugador. El que tenga el número más bajo queda eliminado.' },
     4: { name: 'Doncella', count: 2, effect: 'Estás protegido hasta tu próximo turno.' },
@@ -20,7 +20,7 @@ function createLoveLetterDeck() {
     for (let value = 1; value <= 8; value++) {
         const card = LOVE_LETTER_CARDS[value];
         for (let i = 0; i < card.count; i++) {
-            deck.push({ value, name: card.name, effect: card.effect });
+            deck.push({ value, name: card.name, effect: card.effect, image: card.image });
         }
     }
     shuffleArray(deck);
