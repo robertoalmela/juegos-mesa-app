@@ -654,11 +654,11 @@
             } else if (game === 'espectro' && espectroCfg) {
                 espectroCfg.classList.remove('hidden');
             }
-            // Nuevos juegos no requieren config extra por ahora
-
-            // Quick Stop ahora sí necesita lista de jugadores
-            if (game === 'quickstop') {
-                document.getElementById('playerNames').disabled = false;
+            
+            // Habilitar siempre el campo de jugadores y limpiar cualquier valor previo
+            document.getElementById('playerNames').disabled = false;
+            if (document.getElementById('playerNames').value === 'No requerido') {
+                document.getElementById('playerNames').value = '';
             }
         }
 
