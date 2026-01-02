@@ -473,6 +473,16 @@
                 </div>
             </div>
 
+            <!-- Configuración El Lobo -->
+            <div id="loboConfig" class="hidden">
+                <label>Nombre del Moderador:</label>
+                <input type="text" id="loboModerator" placeholder="Nombre del moderador">
+
+                <div class="info">
+                    💡 El moderador no juega, solo gestiona las fases de noche y día. Debe estar en la lista de jugadores.
+                </div>
+            </div>
+
             <!-- Configuración Quick Stop -->
             <div id="quickstopConfig" class="hidden">
                 <label>Número de Rondas:</label>
@@ -628,11 +638,15 @@
             document.getElementById('quickstopConfig').classList.add('hidden');
             document.getElementById('loveletterConfig').classList.add('hidden');
             document.getElementById('timesupConfig').classList.add('hidden');
+            const loboCfg = document.getElementById('loboConfig');
+            if (loboCfg) loboCfg.classList.add('hidden');
             const espectroCfg = document.getElementById('espectroConfig');
             if (espectroCfg) espectroCfg.classList.add('hidden');
 
             if (game === 'blanco') {
                 document.getElementById('blancoConfig').classList.remove('hidden');
+            } else if (game === 'lobo' && loboCfg) {
+                loboCfg.classList.remove('hidden');
             } else if (game === 'quickstop') {
                 document.getElementById('quickstopConfig').classList.remove('hidden');
             } else if (game === 'loveletter') {
@@ -733,17 +747,36 @@
                     };
                 });
             } else if (selectedGame === 'lobo') {
-                const numLobos = Math.max(1, Math.floor(players.length / 4));
-                const roles = ['lobo'].concat(Array(players.length - numLobos).fill('aldeano'));
+                const moderatorName = document.getElementById('loboModerator').value.trim();
+                if (!moderatorName) {
+                    alert('Por favor indica el nombre del moderador');
+                    return;
+                }
+                if (!players.includes(moderatorName)) {
+                    alert('El moderador debe estar en la lista de jugadores');
+                    return;
+                }
+
+                const playersWithoutModerator = players.filter(p => p !== moderatorName);
+                const numLobos = Math.max(1, Math.floor(playersWithoutModerator.length / 4));
+                const roles = ['lobo'].concat(Array(playersWithoutModerator.length - numLobos).fill('aldeano'));
                 shuffleArray(roles);
 
                 room.players = {};
-                room.moderator = players[0]; // Primer jugador es moderador
-                players.forEach((name, index) => {
-                    room.players[name] = {
-                        role: index === 0 ? 'moderador' : roles[index - 1], // Moderador no juega
-                        alive: index === 0 ? true : true
-                    };
+                room.moderator = moderatorName;
+                players.forEach((name) => {
+                    if (name === moderatorName) {
+                        room.players[name] = {
+                            role: 'moderador',
+                            alive: true
+                        };
+                    } else {
+                        const roleIndex = playersWithoutModerator.indexOf(name);
+                        room.players[name] = {
+                            role: roles[roleIndex],
+                            alive: true
+                        };
+                    }
                 });
                 room.phase = 'night';
                 room.dayCount = 1;
@@ -1078,6 +1111,7 @@
             }
 
             gameHeader.innerHTML = renderGameHeader(room.code, room.game);
+            updateGamePlayerStatus(room.code);
             const player = room.players[playerName];
 
             if (room.game === 'blanco') {
@@ -1093,6 +1127,7 @@
                             <p>No tienes palabra. Debes adivinar cuál es la palabra secreta sin que te descubran.</p>
                             <p>💡 Disimula y trata de integrarte en la conversación</p>
                         </div>
+                        <div class="btn" onclick="startNewBlancoRound('${room.code}')">Nueva Ronda</div>
                     `;
                 } else {
                     gameContent.innerHTML = `
@@ -1106,11 +1141,35 @@
                             <p>Hay un jugador que es el BLANCO y no tiene esta palabra.</p>
                             <p>💡 Habla sobre la palabra sin decirla directamente</p>
                         </div>
+                        <div class="btn" onclick="startNewBlancoRound('${room.code}')">Nueva Ronda</div>
                     `;
                 }
             }
 
             showScreen('gameScreen');
+        }
+
+        // Nueva ronda en Blanco
+        async function startNewBlancoRound(roomCode) {
+            const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+            const room = snapshot.val();
+            if (!room || room.game !== 'blanco') return;
+
+            const wordData = getRandomBlancoWord();
+            const players = Object.keys(room.players);
+            const blancoIndex = Math.floor(Math.random() * players.length);
+
+            const updates = {
+                secretWord: wordData.word,
+                category: wordData.category
+            };
+
+            players.forEach((name, index) => {
+                updates[`players/${name}/role`] = index === blancoIndex ? 'blanco' : 'normal';
+                updates[`players/${name}/word`] = index === blancoIndex ? 'BLANCO' : wordData.word;
+            });
+
+            await database.ref(`rooms/${roomCode}`).update(updates);
         }
 
         // Código Secreto - Generar tablero
@@ -1145,6 +1204,7 @@
             const gameHeader = document.getElementById('gameHeader');
 
             gameHeader.innerHTML = renderGameHeader(roomCode, 'codigo');
+            updateGamePlayerStatus(roomCode);
 
             roomRef.on('value', (snapshot) => {
                 const room = snapshot.val();
@@ -1256,6 +1316,7 @@
             const gameHeader = document.getElementById('gameHeader');
 
             gameHeader.innerHTML = renderGameHeader(roomCode, 'lobo');
+            updateGamePlayerStatus(roomCode);
 
             roomRef.on('value', (snapshot) => {
                 const room = snapshot.val();
@@ -1462,6 +1523,7 @@
             const gameHeader = document.getElementById('gameHeader');
 
             gameHeader.innerHTML = renderGameHeader(roomCode, 'timesup');
+            updateGamePlayerStatus(roomCode);
 
             roomRef.on('value', (snapshot) => {
                 const room = snapshot.val();
@@ -1674,6 +1736,7 @@
             const gameHeader = document.getElementById('gameHeader');
 
             gameHeader.innerHTML = renderGameHeader(roomCode, 'quickstop');
+            updateGamePlayerStatus(roomCode);
 
             roomRef.on('value', (snapshot) => {
                 const room = snapshot.val();
@@ -1768,7 +1831,39 @@
                         ❓ Ayuda
                     </button>
                 </div>
+                <div id="gamePlayerStatus" style="background:#f8f9fa; border:2px dashed #667eea; border-radius:12px; padding:12px; margin-bottom:16px; font-size:13px;"></div>
             `;
+        }
+
+        function updateGamePlayerStatus(roomCode) {
+            const statusEl = document.getElementById('gamePlayerStatus');
+            if (!statusEl) return;
+
+            database.ref('rooms/' + roomCode).once('value', (snapshot) => {
+                const room = snapshot.val();
+                if (!room || !room.players) {
+                    statusEl.innerHTML = '';
+                    return;
+                }
+
+                const players = Object.keys(room.players);
+                const connected = players.filter(p => room.players[p] && room.players[p].joined);
+                const missing = players.filter(p => !room.players[p] || !room.players[p].joined);
+
+                if (players.length === 0) {
+                    statusEl.innerHTML = '';
+                    return;
+                }
+
+                let html = '<div style="font-weight:600; color:#667eea; margin-bottom:6px;">👥 Estado de jugadores</div>';
+                html += `<div style="margin-bottom:4px;">✅ Conectados: ${connected.length}/${players.length}</div>`;
+                
+                if (missing.length > 0) {
+                    html += `<div style="color:#999;">⏳ Faltan: ${missing.join(', ')}</div>`;
+                }
+
+                statusEl.innerHTML = html;
+            });
         }
 
         function showGameHelp(gameName) {
@@ -1874,19 +1969,30 @@
                     </ol>
             `,
                 spyfall: `
-                < h3 >🕵️ Spyfall - Reglas</h3 >
+                <h3>🕵️ Spyfall - Reglas</h3>
                     <p><strong>Objetivo:</strong></p>
                     <ul>
-                        <li><strong>Espía:</strong> Adivinar la ubicación actual.</li>
-                        <li><strong>No Espías:</strong> Descubrir al espía.</li>
+                        <li><strong>Espía:</strong> Adivinar la ubicación secreta.</li>
+                        <li><strong>No Espías:</strong> Descubrir quién es el espía sin revelar demasiado.</li>
                     </ul>
                     <p><strong>Cómo jugar:</strong></p>
                     <ol>
-                        <li>Todos están en la misma ubicación excepto el Espía.</li>
-                        <li>Haced preguntas por turnos ("¿Hace frío aquí?", "¿Vienes mucho?").</li>
-                        <li>No seáis muy específicos (el espía escucha) ni muy vagos (pareceréis espías).</li>
-                        <li>El espía gana si adivina el lugar o si no es descubierto.</li>
+                        <li>Todos los jugadores están en la misma ubicación, excepto el Espía.</li>
+                        <li>Por turnos, los jugadores se hacen preguntas entre sí.</li>
+                        <li>No seáis demasiado específicos (el espía os escucha) ni demasiado vagos (pareceréis sospechosos).</li>
+                        <li>En cualquier momento, podéis votar para acusar a alguien de ser el espía.</li>
+                        <li>El espía gana si adivina la ubicación correcta o si no es descubierto.</li>
                     </ol>
+                    <p><strong>Ejemplos de preguntas:</strong></p>
+                    <ul style="font-size: 13px;">
+                        <li>"¿Vienes aquí a menudo?"</li>
+                        <li>"¿Cuándo fue la última vez que estuviste aquí?"</li>
+                        <li>"¿Qué haces normalmente cuando estás aquí?"</li>
+                        <li>"¿Hay mucha gente normalmente?"</li>
+                        <li>"¿Es este un buen sitio para niños?"</li>
+                        <li>"¿Se puede comer aquí?"</li>
+                        <li>"¿Cuál es tu parte favorita de este lugar?"</li>
+                    </ul>
             `,
                 espectro: `
                 <h3>🌈 Espectro Mental - Reglas</h3>

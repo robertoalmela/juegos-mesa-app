@@ -114,11 +114,15 @@ function selectGameFromDropdown(game) {
     document.getElementById('quickstopConfig').classList.add('hidden');
     document.getElementById('loveletterConfig').classList.add('hidden');
     document.getElementById('timesupConfig').classList.add('hidden');
+    const loboCfg = document.getElementById('loboConfig');
+    if (loboCfg) loboCfg.classList.add('hidden');
     const espectroCfg = document.getElementById('espectroConfig');
     if (espectroCfg) espectroCfg.classList.add('hidden');
 
     if (game === 'blanco') {
         document.getElementById('blancoConfig').classList.remove('hidden');
+    } else if (game === 'lobo' && loboCfg) {
+        loboCfg.classList.remove('hidden');
     } else if (game === 'quickstop') {
         document.getElementById('quickstopConfig').classList.remove('hidden');
     } else if (game === 'loveletter') {
