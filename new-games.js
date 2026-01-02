@@ -122,16 +122,27 @@ function getEspectroPuntosPorDistancia(dist) {
 }
 
 // --- LÓGICA OVER/UNDER ---
+// Juego de estimaciones: cada jugador da un valor numérico, gana el más cercano
 async function startOverUnderRound(roomCode) {
-    const question = OVER_UNDER_QUESTIONS[Math.floor(Math.random() * OVER_UNDER_QUESTIONS.length)];
-    // Generar línea de referencia (entre 80% y 120% de la respuesta real)
-    const line = Math.floor(question.a * (Math.random() * 0.4 + 0.8));
+    const usedQuestions = (await database.ref(`rooms/${roomCode}/usedQuestions`).once('value')).val() || [];
+    let availableQuestions = OVER_UNDER_QUESTIONS.filter((q, idx) => !usedQuestions.includes(idx));
+    
+    if (availableQuestions.length === 0) {
+        // Reiniciar si se acabaron las preguntas
+        await database.ref(`rooms/${roomCode}/usedQuestions`).set([]);
+        availableQuestions = OVER_UNDER_QUESTIONS;
+    }
+    
+    const questionIndex = OVER_UNDER_QUESTIONS.indexOf(availableQuestions[Math.floor(Math.random() * availableQuestions.length)]);
+    const question = OVER_UNDER_QUESTIONS[questionIndex];
+    
+    usedQuestions.push(questionIndex);
 
     await database.ref(`rooms/${roomCode}`).update({
         currentQuestion: question,
-        line: line,
-        phase: 'betting', // betting, reveal
-        bets: {},
+        phase: 'estimating', // estimating, reveal
+        estimates: {},
+        usedQuestions: usedQuestions,
         roundInProgress: true
     });
 }
@@ -148,86 +159,111 @@ function playOverUnder(roomCode, playerName) {
 
         if (!room.roundInProgress) {
             gameContent.innerHTML = `
-                <h2 style="text-align: center; color: #667eea;">📊 Over/Under</h2>
+                <h2 style="text-align: center; color: #667eea;">📊 Estimaciones</h2>
                 <div style="text-align: center; padding: 40px;">
-                    <p style="margin: 20px 0;">¡Adivina si la respuesta es MÁS o MENOS!</p>
-                    ${room.players[playerName].score !== undefined ? `<p>Tu Puntuación: ${room.players[playerName].score}</p>` : ''}
-                    ${Object.keys(room.players)[0] === playerName ?
-                    '<div class="btn" onclick="startOverUnderRound(\'' + roomCode + '\')">Nueva Pregunta</div>' :
-                    '<p style="color: #666;">Esperando al líder...</p>'}
+                    <p style="margin: 20px 0;">¡Estima valores! El más cercano gana puntos.</p>
+                    ${room.players[playerName].score !== undefined ? `<p style="font-size: 24px; font-weight: bold; color: #667eea;">Tu Puntuación: ${room.players[playerName].score}</p>` : ''}
+                    <div class="btn" onclick="startOverUnderRound('${roomCode}')">▶️ Nueva Pregunta</div>
                 </div>
                 ${renderScoreboard(room)}
             `;
             return;
         }
 
-        if (room.phase === 'betting') {
-            const myBet = room.bets && room.bets[playerName];
+        if (room.phase === 'estimating') {
+            const myEstimate = room.estimates && room.estimates[playerName];
 
             let html = `
-                <h2 style="text-align: center; color: #667eea;">📊 Over/Under</h2>
+                <h2 style="text-align: center; color: #667eea;">📊 Estimaciones</h2>
                 <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 15px; text-align: center; margin: 20px 0;">
                     <h3 style="margin-bottom: 15px;">Pregunta:</h3>
-                    <p style="font-size: 24px; font-weight: bold;">${room.currentQuestion.q}</p>
+                    <p style="font-size: 20px; font-weight: bold; line-height: 1.4;">${room.currentQuestion.q}</p>
                 </div>
             `;
 
-            if (myBet) {
+            if (myEstimate !== undefined) {
                 html += `
                     <div style="text-align: center; margin: 20px;">
-                        <p>Has apostado: <strong>${myBet === 'over' ? 'MÁS (+)' : 'MENOS (-)'}</strong></p>
-                        <p>Esperando a los demás...</p>
+                        <p>Tu estimación: <strong style="font-size: 32px; color: #667eea;">${myEstimate}</strong></p>
+                        <p style="color: #666;">Esperando a los demás...</p>
                     </div>
                 `;
             } else {
                 html += `
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                        <div class="btn" style="background: #48bb78;" onclick="submitOverUnderBet('${roomCode}', '${playerName}', 'over')">MÁS (+)</div>
-                        <div class="btn" style="background: #f56565;" onclick="submitOverUnderBet('${roomCode}', '${playerName}', 'under')">MENOS (-)</div>
+                    <div style="text-align: center; margin: 20px;">
+                        <label style="font-weight: bold; font-size: 18px; margin-bottom: 10px; display: block;">Ingresa tu estimación:</label>
+                        <input type="number" id="estimateInput" placeholder="Ej: 100" style="font-size: 24px; padding: 15px; text-align: center; width: 100%; max-width: 300px; margin: 0 auto; display: block; border: 3px solid #667eea; border-radius: 10px;">
+                        <div class="btn" style="margin-top: 15px;" onclick="submitOverUnderEstimate('${roomCode}', '${playerName}')">✅ Confirmar</div>
                     </div>
-                    <p style="text-align: center; margin-top: 10px; color: #666;">¿Crees que la respuesta es mayor o menor a X?</p>
-                    <div style="text-align: center; font-weight: bold; font-size: 20px; margin: 10px;">¿Es más o menos de: ${room.line}?</div>
                 `;
             }
 
-            // Mostrar quién ha votado
-            const voters = Object.keys(room.bets || {}).length;
+            // Mostrar quién ha estimado
+            const estimators = Object.keys(room.estimates || {}).length;
             const totalPlayers = Object.keys(room.players).length;
-            html += `<p style="text-align: center; margin-top: 20px;">Votos: ${voters}/${totalPlayers}</p>`;
+            html += `<p style="text-align: center; margin-top: 20px; font-size: 18px;">Estimaciones: ${estimators}/${totalPlayers}</p>`;
 
-            if (voters === totalPlayers && Object.keys(room.players)[0] === playerName) {
-                html += `<div class="btn" onclick="revealOverUnder('${roomCode}')">Revelar Respuesta</div>`;
+            // Mostrar lista de jugadores que ya estimaron (sin revelar valores)
+            html += '<div style="display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 15px;">';
+            Object.keys(room.players).forEach(p => {
+                const hasEstimated = room.estimates && room.estimates[p] !== undefined;
+                html += `<span style="background: ${hasEstimated ? '#c6f6d5' : '#e2e8f0'}; padding: 8px 15px; border-radius: 20px; font-weight: ${hasEstimated ? 'bold' : 'normal'}; color: ${hasEstimated ? '#22543d' : '#718096'};">${p} ${hasEstimated ? '✓' : ''}</span>`;
+            });
+            html += '</div>';
+
+            if (estimators === totalPlayers) {
+                html += `<div class="btn" onclick="revealOverUnder('${roomCode}')">🎯 Revelar Respuesta</div>`;
             }
 
             gameContent.innerHTML = html;
         } else if (room.phase === 'reveal') {
+            const correctAnswer = room.currentQuestion.a;
+            
+            // Calcular distancias y determinar ganadores
+            const results = [];
+            Object.keys(room.estimates).forEach(p => {
+                const estimate = room.estimates[p];
+                const distance = Math.abs(estimate - correctAnswer);
+                results.push({ player: p, estimate, distance });
+            });
+            
+            results.sort((a, b) => a.distance - b.distance);
+            const minDistance = results[0].distance;
+            const winners = results.filter(r => r.distance === minDistance);
+
             let html = `
-                <h2 style="text-align: center; color: #667eea;">📊 Resultado</h2>
+                <h2 style="text-align: center; color: #667eea;">🎯 Resultado</h2>
                 <div style="background: white; border: 3px solid #667eea; padding: 30px; border-radius: 15px; text-align: center; margin: 20px 0;">
-                    <p>La respuesta correcta era:</p>
-                    <h1 style="font-size: 48px; color: #667eea;">${room.currentQuestion.a}</h1>
-                    <p>Referencia: ${room.line}</p>
+                    <p style="font-size: 18px; color: #666;">La respuesta correcta era:</p>
+                    <h1 style="font-size: 64px; color: #667eea; margin: 15px 0;">${correctAnswer}</h1>
                 </div>
+                <h3 style="text-align: center; margin: 20px 0; color: #667eea;">📊 Estimaciones</h3>
                 <div style="margin-bottom: 20px;">
             `;
 
-            Object.keys(room.players).forEach(p => {
-                const bet = room.bets[p];
-                const won = (bet === 'over' && room.currentQuestion.a > room.line) ||
-                    (bet === 'under' && room.currentQuestion.a < room.line);
-
+            results.forEach((r, idx) => {
+                const isWinner = r.distance === minDistance;
+                const pointsEarned = isWinner ? (winners.length === 1 ? 3 : 1) : 0;
+                
                 html += `
-                    <div style="background: ${won ? '#c6f6d5' : '#fed7d7'}; padding: 10px; margin: 5px 0; border-radius: 8px; display: flex; justify-content: space-between;">
-                        <span>${p} (${bet === 'over' ? '+' : '-'})</span>
-                        <strong>${won ? '+1 Punto' : '0 Puntos'}</strong>
+                    <div style="background: ${isWinner ? '#c6f6d5' : '#f7fafc'}; padding: 15px; margin: 8px 0; border-radius: 10px; border: ${isWinner ? '3px solid #48bb78' : '2px solid #e2e8f0'};">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <span style="font-size: 20px; font-weight: bold;">${idx + 1}. ${r.player}</span>
+                                ${isWinner ? '<span style="margin-left: 10px; font-size: 24px;">🏆</span>' : ''}
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 24px; font-weight: bold; color: #667eea;">${r.estimate}</div>
+                                <div style="font-size: 14px; color: #718096;">Diferencia: ${r.distance}</div>
+                                ${pointsEarned > 0 ? `<div style="font-size: 16px; font-weight: bold; color: #48bb78;">+${pointsEarned} puntos</div>` : ''}
+                            </div>
+                        </div>
                     </div>
                 `;
             });
 
             html += `</div>
-                ${Object.keys(room.players)[0] === playerName ?
-                    '<div class="btn" onclick="startOverUnderRound(\'' + roomCode + '\')">Siguiente Ronda</div>' :
-                    '<p style="text-align: center;">Esperando siguiente ronda...</p>'}
+                <div class="btn" onclick="startOverUnderRound('${roomCode}')">▶️ Siguiente Ronda</div>
                 ${renderScoreboard(room)}
             `;
 
@@ -238,8 +274,16 @@ function playOverUnder(roomCode, playerName) {
     showScreen('gameScreen');
 }
 
-async function submitOverUnderBet(roomCode, playerName, bet) {
-    await database.ref(`rooms/${roomCode}/bets/${playerName}`).set(bet);
+async function submitOverUnderEstimate(roomCode, playerName) {
+    const input = document.getElementById('estimateInput');
+    const value = parseInt(input.value);
+    
+    if (isNaN(value)) {
+        alert('Por favor ingresa un número válido');
+        return;
+    }
+    
+    await database.ref(`rooms/${roomCode}/estimates/${playerName}`).set(value);
 }
 
 async function revealOverUnder(roomCode) {
@@ -247,17 +291,25 @@ async function revealOverUnder(roomCode) {
     const room = snapshot.val();
 
     const updates = { phase: 'reveal' };
+    const correctAnswer = room.currentQuestion.a;
 
-    // Calcular puntuaciones
-    Object.keys(room.players).forEach(p => {
-        const bet = room.bets[p];
-        const won = (bet === 'over' && room.currentQuestion.a > room.line) ||
-            (bet === 'under' && room.currentQuestion.a < room.line);
-
-        if (won) {
-            const currentScore = room.players[p].score || 0;
-            updates[`players/${p}/score`] = currentScore + 1;
-        }
+    // Calcular ganadores y puntuaciones
+    const results = [];
+    Object.keys(room.estimates).forEach(p => {
+        const estimate = room.estimates[p];
+        const distance = Math.abs(estimate - correctAnswer);
+        results.push({ player: p, distance });
+    });
+    
+    results.sort((a, b) => a.distance - b.distance);
+    const minDistance = results[0].distance;
+    const winners = results.filter(r => r.distance === minDistance);
+    
+    // Asignar puntos
+    winners.forEach(w => {
+        const currentScore = room.players[w.player].score || 0;
+        const pointsToAdd = winners.length === 1 ? 3 : 1; // 3 puntos si gana solo, 1 si empata
+        updates[`players/${w.player}/score`] = currentScore + pointsToAdd;
     });
 
     await database.ref(`rooms/${roomCode}`).update(updates);

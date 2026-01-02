@@ -929,11 +929,10 @@
                 }
 
             } else if (selectedGame === 'overunder') {
-                room.currentQuestion = null;
-                room.phase = 'waiting';
+                room.roundInProgress = false;
+                room.usedQuestions = [];
                 room.players = {};
                 players.forEach(name => { room.players[name] = { score: 0 }; });
-                startOverUnderRound(roomCode); // Pre-cargar primera pregunta
             } else if (selectedGame === 'spyfall') {
                 const locKeys = Object.keys(SPYFALL_LOCATIONS);
                 const location = locKeys[Math.floor(Math.random() * locKeys.length)];
