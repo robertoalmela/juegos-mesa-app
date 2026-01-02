@@ -2151,13 +2151,22 @@
                     return;
                 }
 
-                const isRepresentative = player.representative;
                 const myTeam = player.team;
-                // Obtener jugadores del equipo que ESTÁ jugando su turno ahora
-                const currentTeamPlayers = room.currentTeam === 'A' ? room.teamAPlayers : room.teamBPlayers;
-                const currentPlayerName = currentTeamPlayers[room.currentPlayerIndex % currentTeamPlayers.length];
+                // Obtener lista completa de todos los jugadores alternando equipos
+                const allPlayers = [];
+                const teamAPlayers = room.teamAPlayers;
+                const teamBPlayers = room.teamBPlayers;
+                const maxLen = Math.max(teamAPlayers.length, teamBPlayers.length);
+                for (let i = 0; i < maxLen; i++) {
+                    if (i < teamAPlayers.length) allPlayers.push(teamAPlayers[i]);
+                    if (i < teamBPlayers.length) allPlayers.push(teamBPlayers[i]);
+                }
+                
+                const currentPlayerName = allPlayers[room.currentPlayerIndex % allPlayers.length];
                 const isMyTurn = currentPlayerName === playerName;
-                const isMyTeamTurn = room.currentTeam === myTeam;
+                
+                // Determinar equipo del jugador actual
+                const currentPlayerTeam = teamAPlayers.includes(currentPlayerName) ? 'A' : 'B';
 
                 // Detectar fin de juego
                 if (room.currentRound > 3) {
@@ -2176,13 +2185,14 @@
                     return;
                 }
 
-                const roundNames = ['', 'Descripción', 'Una Palabra', 'Mímica'];
+                const roundNames = ['', '🟡 Descripción Libre', '🔵 Una Sola Palabra', '🔴 Mímica'];
                 const isPlaying = room.timerActive;
 
                 let html = `
                     <h2 style="text-align: center; color: #667eea; margin-bottom: 10px;">⏱️ Time's Up</h2>
                     <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 15px;">
-                        <strong>Ronda ${room.currentRound}: ${roundNames[room.currentRound]}</strong>
+                        <strong>Fase ${room.currentRound}: ${roundNames[room.currentRound]}</strong><br>
+                        <small style="opacity: 0.9;">Las mismas cartas en cada fase</small>
                     </div>
                     <div style="display: flex; justify-content: space-around; margin-bottom: 15px;">
                         <div style="background: #ff6b6b; color: white; padding: 15px 20px; border-radius: 8px; font-weight: bold;">
@@ -2205,18 +2215,15 @@
                                     ${currentWord}
                                 </div>
                                 <div class="info">Tú describes/actúas. Tu equipo adivina (en persona).</div>
-                            ` : (isMyTeamTurn ? `
-                                <p style="font-size: 18px;"><strong>Turno de:</strong> ${currentPlayerName}</p>
-                                <p style="color: #667eea;">👂 Tu equipo está adivinando...</p>
                             ` : `
-                                <p style="font-size: 18px;"><strong>Turno de equipo ${room.currentTeam}</strong></p>
-                                <p style="color: #999;">Esperando su turno...</p>
-                            `)}
+                                <p style="font-size: 18px;"><strong>Turno de:</strong> ${currentPlayerName} (Equipo ${currentPlayerTeam})</p>
+                                <p style="color: ${myTeam === currentPlayerTeam ? '#667eea' : '#999'};">👂 ${myTeam === currentPlayerTeam ? 'Tu equipo está adivinando...' : 'Esperando...'}</p>
+                            `}
                         </div>
                     `;
 
-                    // Botón solo para representante del equipo que está jugando su turno
-                    if (isRepresentative && isMyTeamTurn) {
+                    // Botones SIEMPRE visibles para el jugador activo
+                    if (isMyTurn) {
                         html += `
                             <div style="display: grid; gap: 10px; grid-template-columns: 1fr 1fr;">
                                 <div class="btn" onclick="markTimesUpCorrect('${roomCode}')">✅ ACERTÓ</div>
@@ -2227,8 +2234,7 @@
                 } else {
                     html += `
                         <div style="background: #e7f3ff; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 15px;">
-                            <p style="font-size: 18px;"><strong>Turno de equipo ${room.currentTeam}</strong></p>
-                            <p>Jugador activo: ${currentPlayerName}</p>
+                            <p style="font-size: 18px;"><strong>Turno de: ${currentPlayerName} (Equipo ${currentPlayerTeam})</strong></p>
                             ${currentPlayerName === playerName ? '<div class="btn" onclick="startTimesUpTurn(\'' + roomCode + '\')">▶️ Iniciar Turno (30s)</div>' : '<p style="color: #666;">Esperando...</p>'}
                         </div>
                     `;
@@ -2272,15 +2278,26 @@
             const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
             const room = snapshot.val();
 
-            const scoreField = room.currentTeam === 'A' ? 'teamAScore' : 'teamBScore';
+            // Determinar equipo del jugador actual
+            const teamAPlayers = room.teamAPlayers;
+            const teamBPlayers = room.teamBPlayers;
+            const allPlayers = [];
+            const maxLen = Math.max(teamAPlayers.length, teamBPlayers.length);
+            for (let i = 0; i < maxLen; i++) {
+                if (i < teamAPlayers.length) allPlayers.push(teamAPlayers[i]);
+                if (i < teamBPlayers.length) allPlayers.push(teamBPlayers[i]);
+            }
+            const currentPlayerName = allPlayers[room.currentPlayerIndex % allPlayers.length];
+            const currentPlayerTeam = teamAPlayers.includes(currentPlayerName) ? 'A' : 'B';
+            const scoreField = currentPlayerTeam === 'A' ? 'teamAScore' : 'teamBScore';
+            
             const newWordIndex = room.currentWordIndex + 1;
 
             if (newWordIndex >= room.words.length) {
-                // Siguiente ronda
+                // Todas las cartas usadas, siguiente fase
                 await database.ref(`rooms/${roomCode}`).update({
                     currentRound: room.currentRound + 1,
                     currentWordIndex: 0,
-                    currentTeam: 'A',
                     currentPlayerIndex: 0,
                     timerActive: false,
                     timeRemaining: 30,
@@ -2301,11 +2318,10 @@
             const newWordIndex = room.currentWordIndex + 1;
 
             if (newWordIndex >= room.words.length) {
-                // Siguiente ronda sin sumar puntos
+                // Todas las cartas usadas, siguiente fase sin sumar puntos
                 await database.ref(`rooms/${roomCode}`).update({
                     currentRound: room.currentRound + 1,
                     currentWordIndex: 0,
-                    currentTeam: 'A',
                     currentPlayerIndex: 0,
                     timerActive: false,
                     timeRemaining: 30
@@ -2320,15 +2336,24 @@
             const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
             const room = snapshot.val();
 
-            const currentTeamPlayers = room.currentTeam === 'A' ? room.teamAPlayers : room.teamBPlayers;
+            // Lista completa de jugadores alternando equipos
+            const teamAPlayers = room.teamAPlayers;
+            const teamBPlayers = room.teamBPlayers;
+            const allPlayers = [];
+            const maxLen = Math.max(teamAPlayers.length, teamBPlayers.length);
+            for (let i = 0; i < maxLen; i++) {
+                if (i < teamAPlayers.length) allPlayers.push(teamAPlayers[i]);
+                if (i < teamBPlayers.length) allPlayers.push(teamBPlayers[i]);
+            }
+            
             const nextPlayerIndex = room.currentPlayerIndex + 1;
-            const nextTeam = room.currentTeam === 'A' ? 'B' : 'A';
 
-            if (nextPlayerIndex >= currentTeamPlayers.length) {
-                // Cambiar de equipo
+            if (nextPlayerIndex >= allPlayers.length) {
+                // Todos los jugadores terminaron su turno, siguiente fase
                 await database.ref(`rooms/${roomCode}`).update({
-                    currentTeam: nextTeam,
+                    currentRound: room.currentRound + 1,
                     currentPlayerIndex: 0,
+                    currentWordIndex: 0,
                     timerActive: false,
                     timeRemaining: 30
                 });
