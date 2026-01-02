@@ -766,9 +766,8 @@
                 }
 
                 const playersWithoutModerator = players.filter(p => p !== moderatorName);
-                const numLobos = Math.max(1, Math.floor(playersWithoutModerator.length / 4));
-                const roles = ['lobo'].concat(Array(playersWithoutModerator.length - numLobos).fill('aldeano'));
-                shuffleArray(roles);
+                const rolesDistribution = distributeLoboRoles(playersWithoutModerator.length);
+                shuffleArray(rolesDistribution);
 
                 room.players = {};
                 room.moderator = moderatorName;
@@ -781,15 +780,25 @@
                     } else {
                         const roleIndex = playersWithoutModerator.indexOf(name);
                         room.players[name] = {
-                            role: roles[roleIndex],
-                            alive: true
+                            role: rolesDistribution[roleIndex],
+                            alive: true,
+                            enamorado: false,
+                            converted: false
                         };
                     }
                 });
                 room.phase = 'night';
+                room.currentNightTurn = null;
+                room.isFirstNight = true;
                 room.dayCount = 1;
                 room.nightVictim = null;
                 room.dayVotes = {};
+                room.nightActions = {};
+                room.enamorados = [];
+                room.usedPotions = { save: false, kill: false };
+                room.lastProtected = null;
+                room.loboAlfaUsed = false;
+                room.cazadorPending = null;
             } else if (selectedGame === 'codigo') {
                 room.players = {};
                 room.board = generateCodigoSecretoBoard();
@@ -1353,144 +1362,337 @@
                     return;
                 }
 
-                const isModerator = player.role === 'moderador';
-                const alivePlayers = Object.keys(room.players).filter(p => room.players[p].alive && room.players[p].role !== 'moderador');
-                const lobos = Object.keys(room.players).filter(p => room.players[p].role === 'lobo' && room.players[p].alive);
-                const aldeanos = Object.keys(room.players).filter(p => room.players[p].role === 'aldeano' && room.players[p].alive);
-
                 // Detectar fin de juego
-                if (lobos.length === 0) {
+                const victory = checkLoboVictory(room);
+                if (victory) {
+                    const color = victory.winner === 'aldeanos' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)';
+                    const titleColor = victory.winner === 'aldeanos' ? 'white' : '#333';
                     gameContent.innerHTML = `
                         <h2 style="text-align: center; color: #667eea;">🏆 FIN DEL JUEGO</h2>
-                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; border-radius: 15px; text-align: center; margin: 30px 0;">
-                            <h1 style="font-size: 48px; margin: 0;">¡ALDEANOS GANAN!</h1>
-                            <p style="margin-top: 20px;">Todos los lobos han sido eliminados</p>
-                        </div>
-                    `;
-                    return;
-                }
-                if (lobos.length >= aldeanos.length) {
-                    gameContent.innerHTML = `
-                        <h2 style="text-align: center; color: #667eea;">🏆 FIN DEL JUEGO</h2>
-                        <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: #333; padding: 40px; border-radius: 15px; text-align: center; margin: 30px 0;">
-                            <h1 style="font-size: 48px; margin: 0;">¡LOBOS GANAN!</h1>
-                            <p style="margin-top: 20px;">Los lobos han igualado o superado a los aldeanos</p>
+                        <div style="background: ${color}; color: ${titleColor}; padding: 40px; border-radius: 15px; text-align: center; margin: 30px 0;">
+                            <h1 style="font-size: 48px; margin: 0;">¡${victory.winner.toUpperCase()} GANAN!</h1>
+                            <p style="margin-top: 20px;">${victory.message}</p>
                         </div>
                     `;
                     return;
                 }
 
+                const isModerator = player.role === 'moderador';
+                
                 if (isModerator) {
-                    // Vista del moderador
-                    let html = `
-                        <h2 style="text-align: center; color: #667eea; margin-bottom: 10px;">🐺 El Lobo</h2>
-                        <div style="background: #ffc107; color: #333; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 15px;">
-                            <strong>🎭 MODERADOR</strong><br>
-                            Fase: ${room.phase === 'night' ? '🌙 NOCHE' : '☀️ DÍA ' + room.dayCount}
-                        </div>
-                        <div style="margin-bottom: 15px;">
-                            <h3>Jugadores vivos (${alivePlayers.length}):</h3>
-                    `;
-
-                    Object.keys(room.players).forEach(p => {
-                        const player = room.players[p];
-                        if (player.role === 'moderador') return;
-
-                        const roleIcon = player.role === 'lobo' ? '🐺' : '👥';
-                        const status = player.alive ? '✅' : '❌';
-
-                        html += `
-                            <div style="background: ${player.alive ? '#e7f3ff' : '#f8f9fa'}; padding: 12px; border-radius: 8px; margin: 5px 0; border-left: 4px solid ${player.role === 'lobo' ? '#dc3545' : '#667eea'}; opacity: ${player.alive ? 1 : 0.5};">
-                                ${status} <strong>${p}</strong> - ${roleIcon} ${player.role.toUpperCase()}
-                            </div>
-                        `;
-                    });
-
-                    html += '</div>';
-
-                    if (room.phase === 'night') {
-                        html += `
-                            <div class="info">
-                                🌙 Los lobos eligen a quién eliminar. Confirma la víctima:
-                            </div>
-                            <select id="nightVictimSelect" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px; border: 2px solid #667eea;">
-                                <option value="">Seleccionar víctima...</option>
-                                ${aldeanos.map(p => `<option value="${p}">${p}</option>`).join('')}
-                            </select>
-                            <div class="btn" onclick="confirmNightKill('${roomCode}')">✅ Confirmar Muerte Nocturna</div>
-                        `;
-                    } else {
-                        html += `
-                            <div class="info">
-                                ☀️ Los jugadores votan a quién eliminar. Confirma los votos:
-                            </div>
-                        `;
-
-                        if (Object.keys(room.dayVotes || {}).length > 0) {
-                            html += '<h3>Votos actuales:</h3><div style="margin: 10px 0;">';
-                            Object.entries(room.dayVotes).forEach(([voter, target]) => {
-                                html += `<div style="padding: 8px; background: #f8f9fa; border-radius: 5px; margin: 5px 0;"><strong>${voter}</strong> → ${target}</div>`;
-                            });
-                            html += '</div>';
-                        }
-
-                        html += `
-                            <select id="dayVictimSelect" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px; border: 2px solid #667eea;">
-                                <option value="">Seleccionar eliminado...</option>
-                                ${alivePlayers.map(p => `<option value="${p}">${p}</option>`).join('')}
-                            </select>
-                            <div class="btn" onclick="confirmDayElimination('${roomCode}')">✅ Confirmar Eliminación del Día</div>
-                        `;
-                    }
-
-                    gameContent.innerHTML = html;
+                    gameContent.innerHTML = renderModeratorView(room, roomCode);
                 } else {
-                    // Vista de jugador normal
-                    const lobosNames = Object.keys(room.players).filter(p => room.players[p].role === 'lobo').join(', ');
-                    const isWolf = player.role === 'lobo';
-
-                    let html = `
-                        <h2 style="text-align: center; color: #667eea; margin-bottom: 10px;">🐺 El Lobo</h2>
-                        <div style="background: ${isWolf ? 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}; color: ${isWolf ? '#333' : 'white'}; padding: 30px; border-radius: 15px; text-align: center; margin-bottom: 15px;">
-                            <h2 style="font-size: 28px; margin-bottom: 10px;">${isWolf ? '🐺 Eres un LOBO' : '👥 Eres un ALDEANO'}</h2>
-                            ${isWolf ? `<p><strong>Otros lobos:</strong> ${lobosNames}</p>` : '<p>Debes encontrar y eliminar a los lobos</p>'}
-                            ${player.alive ? '' : '<p style="margin-top: 15px; font-weight: bold;">❌ ESTÁS ELIMINADO</p>'}
-                        </div>
-                        <div style="background: ${room.phase === 'night' ? '#2c3e50' : '#fffbea'}; color: ${room.phase === 'night' ? 'white' : '#333'}; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 15px;">
-                            <strong>Fase actual:</strong> ${room.phase === 'night' ? '🌙 NOCHE' : '☀️ DÍA ' + room.dayCount}
-                        </div>
-                        <h3>Jugadores vivos:</h3>
-                        <div style="margin-bottom: 15px;">
-                    `;
-
-                    alivePlayers.forEach(p => {
-                        html += `<div style="background: #e7f3ff; padding: 10px; border-radius: 8px; margin: 5px 0;">✅ ${p}</div>`;
-                    });
-
-                    html += '</div>';
-
-                    if (player.alive && room.phase === 'day') {
-                        html += `
-                            <h3>Vota para eliminar:</h3>
-                            <select id="voteSelect" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px; border: 2px solid #667eea;">
-                                <option value="">Seleccionar...</option>
-                                ${alivePlayers.filter(p => p !== playerName).map(p => `<option value="${p}">${p}</option>`).join('')}
-                            </select>
-                            <div class="btn" onclick="submitDayVote('${roomCode}', '${playerName}')">🗳️ Enviar Voto</div>
-                        `;
-                    }
-
-                    if (room.phase === 'night') {
-                        html += `<div class="info">🌙 El moderador gestiona la fase de noche. Los lobos discuten en privado.</div>`;
-                    } else {
-                        html += `<div class="info">☀️ Discutan y voten a quién creen que es un lobo.</div>`;
-                    }
-
-                    gameContent.innerHTML = html;
+                    gameContent.innerHTML = renderPlayerView(room, playerName);
                 }
             });
 
             showScreen('gameScreen');
+        }
+
+        function renderModeratorView(room, roomCode) {
+            const alivePlayers = Object.keys(room.players).filter(p => room.players[p].alive && room.players[p].role !== 'moderador');
+            const nightTurns = getNightTurnOrder(room);
+            const currentTurnIndex = room.currentNightTurn ? nightTurns.indexOf(room.currentNightTurn) : -1;
+            
+            let html = `
+                <h2 style="text-align: center; color: #667eea; margin-bottom: 10px;">🐺 El Lobo - Moderador</h2>
+                <div style="background: #ffc107; color: #333; padding: 15px; border-radius: 10px; text-align: center; margin-bottom: 15px;">
+                    <strong>🎭 MODERADOR</strong><br>
+                    Fase: ${room.phase === 'night' ? '🌙 NOCHE' + (room.isFirstNight ? ' (Primera)' : '') : '☀️ DÍA ' + room.dayCount}
+                    ${room.phase === 'night' && room.currentNightTurn ? `<br>Turno: ${room.currentNightTurn.toUpperCase()}` : ''}
+                </div>
+            `;
+
+            // Botones de control de fase
+            if (room.phase === 'night') {
+                if (!room.currentNightTurn) {
+                    html += `<div class="btn" onclick="startNightPhase('${roomCode}')">Iniciar Turnos de Noche</div>`;
+                } else if (currentTurnIndex < nightTurns.length - 1) {
+                    html += `
+                        <div class="info">Turno actual: <strong>${room.currentNightTurn}</strong></div>
+                        <div class="btn" onclick="nextNightTurn('${roomCode}')">Siguiente Turno</div>
+                    `;
+                } else {
+                    html += `
+                        <div class="info">Todos los turnos completados</div>
+                        <div class="btn" onclick="resolveNight('${roomCode}')">Resolver Noche y Pasar al Día</div>
+                    `;
+                }
+            } else if (room.cazadorPending) {
+                html += `<div class="info" style="background: #ff6b6b; color: white;">Esperando que el Cazador elija su víctima...</div>`;
+            } else {
+                html += `
+                    <div class="info">Fase de día. Los jugadores votan.</div>
+                `;
+            }
+
+            // Lista de jugadores con roles
+            html += '<div style="margin: 20px 0;"><h3>Jugadores:</h3>';
+            Object.keys(room.players).forEach(p => {
+                const pl = room.players[p];
+                if (pl.role === 'moderador') return;
+
+                const icon = getRoleIcon(pl.role);
+                const status = pl.alive ? '✅' : '❌';
+                const enamorado = pl.enamorado ? '💘' : '';
+                const converted = pl.converted ? ' (Convertido)' : '';
+
+                html += `
+                    <div style="background: ${pl.alive ? '#e7f3ff' : '#f8f9fa'}; padding: 12px; border-radius: 8px; margin: 5px 0; border-left: 4px solid ${(pl.role === 'lobo' || pl.role === 'loboalfa') ? '#dc3545' : '#667eea'}; opacity: ${pl.alive ? 1 : 0.5};">
+                        ${status} ${enamorado} <strong>${p}</strong> - ${icon} ${pl.role.toUpperCase()}${converted}
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            // Información de acciones nocturnas
+            if (room.phase === 'night' && room.nightActions && Object.keys(room.nightActions).length > 0) {
+                html += '<div style="background: #2c3e50; color: white; padding: 15px; border-radius: 10px; margin: 15px 0;"><h4>Acciones de la noche:</h4>';
+                Object.entries(room.nightActions).forEach(([action, value]) => {
+                    html += `<div>• ${action}: ${JSON.stringify(value)}</div>`;
+                });
+                html += '</div>';
+            }
+
+            // Votación del día
+            if (room.phase === 'day' && !room.cazadorPending) {
+                if (Object.keys(room.dayVotes || {}).length > 0) {
+                    html += '<h3>Votos actuales:</h3><div style="margin: 10px 0;">';
+                    const voteCounts = {};
+                    Object.entries(room.dayVotes).forEach(([voter, target]) => {
+                        const voterPlayer = room.players[voter];
+                        const voteValue = voterPlayer && voterPlayer.role === 'alcalde' ? 2 : 1;
+                        voteCounts[target] = (voteCounts[target] || 0) + voteValue;
+                        html += `<div style="padding: 8px; background: #f8f9fa; border-radius: 5px; margin: 5px 0;"><strong>${voter}</strong> ${voterPlayer && voterPlayer.role === 'alcalde' ? '(x2)' : ''} → ${target}</div>`;
+                    });
+                    html += '</div><h4>Conteo:</h4><div>';
+                    Object.entries(voteCounts).sort((a, b) => b[1] - a[1]).forEach(([target, count]) => {
+                        html += `<div style="padding: 8px; background: #fffbea; border-radius: 5px; margin: 5px 0; font-weight: bold;">${target}: ${count} votos</div>`;
+                    });
+                    html += '</div>';
+                }
+
+                html += `
+                    <h3 style="margin-top: 20px;">Eliminar jugador:</h3>
+                    <select id="dayVictimSelect" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px; border: 2px solid #667eea;">
+                        <option value="">Seleccionar eliminado...</option>
+                        <option value="nadie">Nadie (empate/decisión del pueblo)</option>
+                        ${alivePlayers.map(p => `<option value="${p}">${p}</option>`).join('')}
+                    </select>
+                    <div class="btn" onclick="resolveDayVote('${roomCode}')">Confirmar Eliminación</div>
+                `;
+            }
+
+            return html;
+        }
+
+        function renderPlayerView(room, playerName) {
+            const player = room.players[playerName];
+            const alivePlayers = Object.keys(room.players).filter(p => room.players[p].alive && room.players[p].role !== 'moderador');
+            const myRole = player.role;
+            const roleIcon = getRoleIcon(myRole);
+            const roleDesc = getRoleDescription(myRole);
+            
+            // Información de lobos para lobos
+            let lobosInfo = '';
+            if (myRole === 'lobo' || myRole === 'loboalfa') {
+                const otherLobos = Object.keys(room.players).filter(p => 
+                    p !== playerName && 
+                    (room.players[p].role === 'lobo' || room.players[p].role === 'loboalfa') && 
+                    room.players[p].alive
+                );
+                lobosInfo = otherLobos.length > 0 ? `<p><strong>Otros lobos:</strong> ${otherLobos.join(', ')}</p>` : '<p>Eres el único lobo</p>';
+            }
+
+            // Información de enamorados
+            let enamoradoInfo = '';
+            if (player.enamorado && room.enamorados && room.enamorados.length === 2) {
+                const otherEnamorado = room.enamorados.find(e => e !== playerName);
+                enamoradoInfo = `<div style="background: #ff69b4; color: white; padding: 10px; border-radius: 8px; margin: 10px 0;">💘 Estás enamorado de <strong>${otherEnamorado}</strong></div>`;
+            }
+
+            let html = `
+                <h2 style="text-align: center; color: #667eea; margin-bottom: 10px;">🐺 El Lobo</h2>
+                <div style="background: linear-gradient(135deg, ${(myRole === 'lobo' || myRole === 'loboalfa') ? '#fa709a 0%, #fee140' : '#667eea 0%, #764ba2'} 100%); color: ${(myRole === 'lobo' || myRole === 'loboalfa') ? '#333' : 'white'}; padding: 30px; border-radius: 15px; text-align: center; margin-bottom: 15px;">
+                    <h2 style="font-size: 28px; margin-bottom: 10px;">${roleIcon} Eres: ${myRole.toUpperCase()}</h2>
+                    <p>${roleDesc}</p>
+                    ${lobosInfo}
+                    ${!player.alive ? '<p style="margin-top: 15px; font-weight: bold; font-size: 20px;">❌ ESTÁS ELIMINADO</p>' : ''}
+                </div>
+                ${enamoradoInfo}
+                <div style="background: ${room.phase === 'night' ? '#2c3e50' : '#fffbea'}; color: ${room.phase === 'night' ? 'white' : '#333'}; padding: 20px; border-radius: 10px; text-align: center; margin-bottom: 15px;">
+                    <strong>Fase:</strong> ${room.phase === 'night' ? '🌙 NOCHE' : '☀️ DÍA ' + room.dayCount}
+                    ${room.phase === 'night' && room.currentNightTurn ? `<br><small>Turno: ${room.currentNightTurn}</small>` : ''}
+                </div>
+            `;
+
+            // Jugadores vivos
+            html += '<h3>Jugadores vivos:</h3><div style="margin-bottom: 15px;">';
+            alivePlayers.forEach(p => {
+                const isEnamorado = room.enamorados && room.enamorados.includes(p) ? '💘' : '';
+                html += `<div style="background: #e7f3ff; padding: 10px; border-radius: 8px; margin: 5px 0;">✅ ${p} ${isEnamorado}</div>`;
+            });
+            html += '</div>';
+
+            // Acción según fase y rol
+            if (player.alive) {
+                if (room.phase === 'night' && room.currentNightTurn) {
+                    html += renderNightAction(room, playerName, myRole);
+                } else if (room.phase === 'day') {
+                    if (room.cazadorPending === playerName) {
+                        // Cazador murió, debe elegir víctima
+                        html += `
+                            <div style="background: #ff6b6b; color: white; padding: 20px; border-radius: 10px; margin: 15px 0;">
+                                <h3>🏹 Poder del Cazador</h3>
+                                <p>Has muerto. Elige a quién llevarte contigo:</p>
+                            </div>
+                            <select id="cazadorVictimSelect" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px; border: 2px solid #ff6b6b;">
+                                <option value="">Seleccionar...</option>
+                                ${alivePlayers.filter(p => p !== playerName).map(p => `<option value="${p}">${p}</option>`).join('')}
+                            </select>
+                            <div class="btn" onclick="submitCazadorKill('${room.code}')">Confirmar</div>
+                        `;
+                    } else {
+                        // Votación normal del día
+                        const hasVoted = room.dayVotes && room.dayVotes[playerName];
+                        html += `
+                            <h3>Vota para eliminar:</h3>
+                            ${hasVoted ? `<div class="info">✅ Ya has votado por: <strong>${room.dayVotes[playerName]}</strong></div>` : ''}
+                            <select id="voteSelect" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px; border: 2px solid #667eea;">
+                                <option value="">Seleccionar...</option>
+                                ${alivePlayers.filter(p => p !== playerName).map(p => `<option value="${p}">${p}</option>`).join('')}
+                            </select>
+                            <div class="btn" onclick="submitDayVote('${room.code}', '${playerName}')">🗳️ Enviar Voto${myRole === 'alcalde' ? ' (x2)' : ''}</div>
+                        `;
+                    }
+                } else {
+                    html += `<div class="info">🌙 El moderador está gestionando la noche. ${(myRole === 'lobo' || myRole === 'loboalfa') ? 'Discute con tu manada en privado.' : 'Descansa.'}</div>`;
+                }
+            }
+
+            return html;
+        }
+
+        function renderNightAction(room, playerName, myRole) {
+            const alivePlayers = Object.keys(room.players).filter(p => room.players[p].alive && room.players[p].role !== 'moderador');
+            let html = '';
+
+            // Solo mostrar si es el turno del rol del jugador
+            if (room.currentNightTurn === 'cupido' && myRole === 'cupido') {
+                html += `
+                    <div style="background: #ff69b4; color: white; padding: 20px; border-radius: 10px; margin: 15px 0;">
+                        <h3>💘 Tu turno: Cupido</h3>
+                        <p>Elige 2 enamorados (morirán juntos si uno muere):</p>
+                    </div>
+                    <label>Enamorado 1:</label>
+                    <select id="enamorado1" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px;">
+                        <option value="">Seleccionar...</option>
+                        ${alivePlayers.map(p => `<option value="${p}">${p}</option>`).join('')}
+                    </select>
+                    <label>Enamorado 2:</label>
+                    <select id="enamorado2" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px;">
+                        <option value="">Seleccionar...</option>
+                        ${alivePlayers.map(p => `<option value="${p}">${p}</option>`).join('')}
+                    </select>
+                    <div class="btn" onclick="submitCupidoAction('${room.code}')">Confirmar Enamorados</div>
+                `;
+            } else if (room.currentNightTurn === 'lobos' && (myRole === 'lobo' || myRole === 'loboalfa')) {
+                if (room.isFirstNight) {
+                    html += `<div class="info" style="background: #2c3e50; color: white;">Esta es la primera noche. Los lobos se conocen pero NO eligen víctima aún. Esperando al moderador...</div>`;
+                } else {
+                    html += `
+                        <div style="background: #2c3e50; color: white; padding: 20px; border-radius: 10px; margin: 15px 0;">
+                            <h3>🐺 Tu turno: Lobos</h3>
+                            <p>Elige una víctima para esta noche:</p>
+                        </div>
+                        <select id="loboVictimSelect" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px;">
+                            <option value="">Seleccionar...</option>
+                            ${alivePlayers.filter(p => room.players[p].role !== 'lobo' && room.players[p].role !== 'loboalfa').map(p => `<option value="${p}">${p}</option>`).join('')}
+                        </select>
+                        <div class="btn" onclick="submitLoboKill('${room.code}', '${playerName}')">Confirmar Víctima</div>
+                    `;
+                }
+            } else if (room.currentNightTurn === 'loboalfa' && myRole === 'loboalfa' && !room.loboAlfaUsed) {
+                html += `
+                    <div style="background: #8b4513; color: white; padding: 20px; border-radius: 10px; margin: 15px 0;">
+                        <h3>🐺👑 Tu turno: Lobo Alfa</h3>
+                        <p>Puedes convertir a un aldeano en lobo (solo 1 vez en la partida):</p>
+                    </div>
+                    <select id="loboAlfaConvertSelect" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px;">
+                        <option value="">No convertir a nadie</option>
+                        ${alivePlayers.filter(p => room.players[p].role !== 'lobo' && room.players[p].role !== 'loboalfa').map(p => `<option value="${p}">${p}</option>`).join('')}
+                    </select>
+                    <div class="btn" onclick="submitLoboAlfaConvert('${room.code}')">Confirmar</div>
+                `;
+            } else if (room.currentNightTurn === 'vidente' && myRole === 'vidente') {
+                html += `
+                    <div style="background: #9c27b0; color: white; padding: 20px; border-radius: 10px; margin: 15px 0;">
+                        <h3>🔮 Tu turno: Vidente</h3>
+                        <p>Elige a quién quieres ver su rol:</p>
+                    </div>
+                    <select id="videnteTargetSelect" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px;">
+                        <option value="">Seleccionar...</option>
+                        ${alivePlayers.filter(p => p !== playerName).map(p => `<option value="${p}">${p}</option>`).join('')}
+                    </select>
+                    <div class="btn" onclick="submitVidenteAction('${room.code}')">Ver Rol</div>
+                `;
+                
+                // Mostrar resultado si ya vio a alguien
+                if (room.nightActions && room.nightActions.videnteResult) {
+                    const result = room.nightActions.videnteResult;
+                    html += `<div class="info" style="background: #9c27b0; color: white; margin-top: 10px;">✅ <strong>${result.target}</strong> es: ${getRoleIcon(result.role)} <strong>${result.role.toUpperCase()}</strong></div>`;
+                }
+            } else if (room.currentNightTurn === 'guardian' && myRole === 'guardian') {
+                html += `
+                    <div style="background: #2196f3; color: white; padding: 20px; border-radius: 10px; margin: 15px 0;">
+                        <h3>🛡️ Tu turno: Guardián</h3>
+                        <p>Elige a quién proteger esta noche:</p>
+                        ${room.lastProtected ? `<p><small>Último protegido: ${room.lastProtected}</small></p>` : ''}
+                    </div>
+                    <select id="guardianProtectSelect" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px;">
+                        <option value="">Seleccionar...</option>
+                        ${alivePlayers.filter(p => p !== room.lastProtected).map(p => `<option value="${p}">${p}</option>`).join('')}
+                    </select>
+                    <div class="btn" onclick="submitGuardianAction('${room.code}')">Proteger</div>
+                `;
+            } else if (room.currentNightTurn === 'bruja' && myRole === 'bruja') {
+                const victim = room.nightVictim;
+                html += `
+                    <div style="background: #4caf50; color: white; padding: 20px; border-radius: 10px; margin: 15px 0;">
+                        <h3>🧙 Tu turno: Bruja</h3>
+                        ${victim ? `<p>Los lobos han elegido a: <strong>${victim}</strong></p>` : '<p>No hay víctima esta noche.</p>'}
+                    </div>
+                `;
+                
+                if (victim && !room.usedPotions.save) {
+                    html += `
+                        <div class="btn" onclick="submitBrujaAction('${room.code}', 'save', '${victim}')">💚 Usar Poción de Vida (salvar a ${victim})</div>
+                    `;
+                }
+                
+                if (!room.usedPotions.kill) {
+                    html += `
+                        <label>Poción de Muerte:</label>
+                        <select id="brujaKillSelect" style="width: 100%; padding: 10px; margin: 10px 0; border-radius: 8px;">
+                            <option value="">No usar</option>
+                            ${alivePlayers.filter(p => p !== playerName && p !== victim).map(p => `<option value="${p}">${p}</option>`).join('')}
+                        </select>
+                        <div class="btn" onclick="submitBrujaKillAction('${room.code}')">☠️ Usar Poción de Muerte</div>
+                    `;
+                }
+                
+                html += `<div class="btn btn-secondary" onclick="submitBrujaAction('${room.code}', 'pass', null)">Pasar (no usar pociones)</div>`;
+            } else if (room.currentNightTurn === 'niña' && myRole === 'niña') {
+                html += `
+                    <div class="info" style="background: #ff9800; color: white;">
+                        👧 Turno de la Niña: Puedes espiar a los lobos (solo ves información). El moderador te dirá quiénes son si decides espiar.
+                    </div>
+                `;
+            } else {
+                html += `<div class="info">Turno de <strong>${room.currentNightTurn}</strong>. Esperando...</div>`;
+            }
+
+            return html;
         }
 
         async function confirmNightKill(roomCode) {
@@ -1535,6 +1737,382 @@
 
             await database.ref(`rooms/${roomCode}/dayVotes/${playerName}`).set(vote);
             alert('Voto enviado al moderador');
+        }
+
+        // ============================================
+        // EL LOBO - Funciones auxiliares
+        // ============================================
+
+        function distributeLoboRoles(numPlayers) {
+            // Calcular número de lobos: 3-6 = 1 lobo, 7-12 = 2 lobos, 13-18 = 3 lobos
+            const numLobos = Math.floor((numPlayers - 1) / 6) + 1;
+            const hasLoboAlfa = numLobos >= 2;
+            
+            const roles = [];
+            
+            // Añadir lobos
+            if (hasLoboAlfa) {
+                roles.push('loboalfa');
+                for (let i = 1; i < numLobos; i++) {
+                    roles.push('lobo');
+                }
+            } else {
+                roles.push('lobo');
+            }
+            
+            // Roles especiales aldeanos (prioridad)
+            const specialRoles = ['vidente', 'bruja', 'cazador', 'cupido', 'guardian', 'niña', 'alcalde'];
+            const availableSlots = numPlayers - roles.length;
+            const numSpecialRoles = Math.min(specialRoles.length, availableSlots - 1); // Al menos 1 aldeano simple
+            
+            for (let i = 0; i < numSpecialRoles; i++) {
+                roles.push(specialRoles[i]);
+            }
+            
+            // Rellenar con aldeanos simples
+            while (roles.length < numPlayers) {
+                roles.push('aldeano');
+            }
+            
+            return roles;
+        }
+
+        function getRoleIcon(role) {
+            const icons = {
+                'moderador': '🎭',
+                'lobo': '🐺',
+                'loboalfa': '🐺👑',
+                'aldeano': '👨',
+                'vidente': '🔮',
+                'bruja': '🧙',
+                'cazador': '🏹',
+                'cupido': '💘',
+                'guardian': '🛡️',
+                'niña': '👧',
+                'alcalde': '👔'
+            };
+            return icons[role] || '❓';
+        }
+
+        function getRoleDescription(role) {
+            const descriptions = {
+                'lobo': 'Eliminas aldeanos por la noche',
+                'loboalfa': 'Puedes convertir a un aldeano (1 uso)',
+                'aldeano': 'Descubre a los lobos',
+                'vidente': 'Ves el rol de alguien cada noche',
+                'bruja': 'Poción de vida y muerte (1 uso c/u)',
+                'cazador': 'Al morir te llevas a alguien',
+                'cupido': 'Primera noche: elige 2 enamorados',
+                'guardian': 'Protege a alguien cada noche',
+                'niña': 'Puedes espiar a los lobos',
+                'alcalde': 'Tu voto cuenta doble'
+            };
+            return descriptions[role] || '';
+        }
+
+        function getNightTurnOrder(room) {
+            const turns = [];
+            const players = Object.keys(room.players).filter(p => room.players[p].alive && room.players[p].role !== 'moderador');
+            
+            if (room.isFirstNight) {
+                // Primera noche: solo Cupido y presentación de lobos
+                if (players.some(p => room.players[p].role === 'cupido')) {
+                    turns.push('cupido');
+                }
+                turns.push('lobos');
+            } else {
+                // Noches siguientes
+                turns.push('lobos');
+                if (players.some(p => room.players[p].role === 'loboalfa') && !room.loboAlfaUsed) {
+                    turns.push('loboalfa');
+                }
+                if (players.some(p => room.players[p].role === 'vidente')) {
+                    turns.push('vidente');
+                }
+                if (players.some(p => room.players[p].role === 'guardian')) {
+                    turns.push('guardian');
+                }
+                if (players.some(p => room.players[p].role === 'bruja')) {
+                    turns.push('bruja');
+                }
+                if (players.some(p => room.players[p].role === 'niña')) {
+                    turns.push('niña');
+                }
+            }
+            
+            return turns;
+        }
+
+        function checkLoboVictory(room) {
+            const alivePlayers = Object.keys(room.players).filter(p => room.players[p].alive && room.players[p].role !== 'moderador');
+            const lobos = alivePlayers.filter(p => room.players[p].role === 'lobo' || room.players[p].role === 'loboalfa');
+            const aldeanos = alivePlayers.filter(p => room.players[p].role !== 'lobo' && room.players[p].role !== 'loboalfa');
+            
+            if (lobos.length === 0) {
+                return { winner: 'aldeanos', message: 'Todos los lobos han sido eliminados' };
+            }
+            if (lobos.length >= aldeanos.length) {
+                return { winner: 'lobos', message: 'Los lobos han igualado o superado a los aldeanos' };
+            }
+            return null;
+        }
+
+        // Funciones de control de fases y turnos nocturnos
+        async function startNightPhase(roomCode) {
+            const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+            const room = snapshot.val();
+            const nightTurns = getNightTurnOrder(room);
+            
+            if (nightTurns.length > 0) {
+                await database.ref(`rooms/${roomCode}`).update({
+                    currentNightTurn: nightTurns[0],
+                    nightActions: {}
+                });
+            }
+        }
+
+        async function nextNightTurn(roomCode) {
+            const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+            const room = snapshot.val();
+            const nightTurns = getNightTurnOrder(room);
+            const currentIndex = nightTurns.indexOf(room.currentNightTurn);
+            
+            if (currentIndex < nightTurns.length - 1) {
+                await database.ref(`rooms/${roomCode}/currentNightTurn`).set(nightTurns[currentIndex + 1]);
+            }
+        }
+
+        async function resolveNight(roomCode) {
+            const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+            const room = snapshot.val();
+            
+            let victim = room.nightVictim;
+            const nightActions = room.nightActions || {};
+            const deaths = [];
+            
+            // Procesar protección del guardián
+            if (nightActions.guardianProtect && nightActions.guardianProtect === victim) {
+                victim = null; // Salvado por el guardián
+            }
+            
+            // Procesar acción de la bruja
+            if (nightActions.brujaSave && nightActions.brujaSave === victim) {
+                victim = null; // Salvado por la bruja
+            }
+            
+            if (victim) {
+                deaths.push(victim);
+            }
+            
+            // Añadir muerte por poción de la bruja
+            if (nightActions.brujaKill) {
+                deaths.push(nightActions.brujaKill);
+            }
+            
+            // Aplicar muertes
+            const updates = {
+                phase: 'day',
+                currentNightTurn: null,
+                nightVictim: null,
+                nightActions: {},
+                isFirstNight: false
+            };
+            
+            deaths.forEach(playerName => {
+                updates[`players/${playerName}/alive`] = false;
+                
+                // Si muere un enamorado, el otro también muere
+                if (room.enamorados && room.enamorados.includes(playerName)) {
+                    const otherEnamorado = room.enamorados.find(e => e !== playerName);
+                    if (otherEnamorado && room.players[otherEnamorado].alive) {
+                        updates[`players/${otherEnamorado}/alive`] = false;
+                    }
+                }
+                
+                // Si muere el cazador, activar su poder
+                if (room.players[playerName].role === 'cazador') {
+                    updates.cazadorPending = playerName;
+                }
+            });
+            
+            await database.ref(`rooms/${roomCode}`).update(updates);
+        }
+
+        // Funciones de acciones específicas por rol
+        async function submitCupidoAction(roomCode) {
+            const e1 = document.getElementById('enamorado1').value;
+            const e2 = document.getElementById('enamorado2').value;
+            
+            if (!e1 || !e2 || e1 === e2) {
+                alert('Debes elegir 2 jugadores diferentes');
+                return;
+            }
+            
+            await database.ref(`rooms/${roomCode}`).update({
+                enamorados: [e1, e2],
+                [`players/${e1}/enamorado`]: true,
+                [`players/${e2}/enamorado`]: true
+            });
+            
+            alert('Enamorados elegidos!');
+        }
+
+        async function submitLoboKill(roomCode, playerName) {
+            const victim = document.getElementById('loboVictimSelect').value;
+            
+            if (!victim) {
+                alert('Debes elegir una víctima');
+                return;
+            }
+            
+            await database.ref(`rooms/${roomCode}`).update({
+                nightVictim: victim,
+                [`nightActions/loboVictim`]: victim
+            });
+            
+            alert('Víctima elegida! El moderador avanzará al siguiente turno.');
+        }
+
+        async function submitLoboAlfaConvert(roomCode) {
+            const target = document.getElementById('loboAlfaConvertSelect').value;
+            
+            if (target) {
+                await database.ref(`rooms/${roomCode}`).update({
+                    [`players/${target}/role`]: 'lobo',
+                    [`players/${target}/converted`]: true,
+                    loboAlfaUsed: true,
+                    [`nightActions/loboAlfaConverted`]: target
+                });
+                alert(`Has convertido a ${target} en lobo!`);
+            } else {
+                await database.ref(`rooms/${roomCode}/nightActions/loboAlfaConverted`).set('nadie');
+                alert('No has convertido a nadie.');
+            }
+        }
+
+        async function submitVidenteAction(roomCode) {
+            const target = document.getElementById('videnteTargetSelect').value;
+            
+            if (!target) {
+                alert('Debes elegir un jugador');
+                return;
+            }
+            
+            const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+            const room = snapshot.val();
+            const targetRole = room.players[target].role;
+            
+            await database.ref(`rooms/${roomCode}/nightActions`).update({
+                vidente: target,
+                videnteResult: { target, role: targetRole }
+            });
+        }
+
+        async function submitGuardianAction(roomCode) {
+            const target = document.getElementById('guardianProtectSelect').value;
+            
+            if (!target) {
+                alert('Debes elegir un jugador');
+                return;
+            }
+            
+            await database.ref(`rooms/${roomCode}`).update({
+                lastProtected: target,
+                [`nightActions/guardianProtect`]: target
+            });
+            
+            alert(`Has protegido a ${target}!`);
+        }
+
+        async function submitBrujaAction(roomCode, action, target) {
+            if (action === 'save') {
+                await database.ref(`rooms/${roomCode}`).update({
+                    [`nightActions/brujaSave`]: target,
+                    [`usedPotions/save`]: true
+                });
+                alert('Has salvado a ' + target + '!');
+            } else if (action === 'pass') {
+                alert('Has pasado tu turno.');
+            }
+        }
+
+        async function submitBrujaKillAction(roomCode) {
+            const target = document.getElementById('brujaKillSelect').value;
+            
+            if (target) {
+                await database.ref(`rooms/${roomCode}`).update({
+                    [`nightActions/brujaKill`]: target,
+                    [`usedPotions/kill`]: true
+                });
+                alert('Has usado la poción de muerte en ' + target + '!');
+            } else {
+                alert('No has usado la poción de muerte.');
+            }
+        }
+
+        async function submitCazadorKill(roomCode) {
+            const target = document.getElementById('cazadorVictimSelect').value;
+            
+            if (!target) {
+                alert('Debes elegir a quién llevarte');
+                return;
+            }
+            
+            await database.ref(`rooms/${roomCode}`).update({
+                [`players/${target}/alive`]: false,
+                cazadorPending: null
+            });
+            
+            alert('Te has llevado a ' + target + ' contigo!');
+        }
+
+        async function resolveDayVote(roomCode) {
+            const victim = document.getElementById('dayVictimSelect').value;
+            
+            if (!victim) {
+                alert('Debes seleccionar un jugador o "nadie"');
+                return;
+            }
+            
+            if (victim === 'nadie') {
+                // Empate o decisión del pueblo: pasar a noche sin eliminar a nadie
+                const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+                const room = snapshot.val();
+                
+                await database.ref(`rooms/${roomCode}`).update({
+                    phase: 'night',
+                    dayCount: room.dayCount + 1,
+                    dayVotes: {},
+                    currentNightTurn: null
+                });
+            } else {
+                const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+                const room = snapshot.val();
+                
+                const updates = {
+                    [`players/${victim}/alive`]: false,
+                    phase: 'night',
+                    dayCount: room.dayCount + 1,
+                    dayVotes: {},
+                    currentNightTurn: null
+                };
+                
+                // Si muere un enamorado, el otro también
+                if (room.enamorados && room.enamorados.includes(victim)) {
+                    const otherEnamorado = room.enamorados.find(e => e !== victim);
+                    if (otherEnamorado && room.players[otherEnamorado].alive) {
+                        updates[`players/${otherEnamorado}/alive`] = false;
+                    }
+                }
+                
+                // Si es el cazador, activar su poder
+                if (room.players[victim].role === 'cazador') {
+                    updates.cazadorPending = victim;
+                    updates.phase = 'day'; // Mantener en día hasta que el cazador elija
+                }
+                
+                await database.ref(`rooms/${roomCode}`).update(updates);
+            }
         }
 
         // ============================================
