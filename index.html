@@ -837,7 +837,18 @@
                     };
                 });
             } else if (selectedGame === 'loveletter') {
-                room.pointsToWin = parseInt(document.getElementById('pointsToWin').value) || 4;
+                // Puntos automáticos según número de jugadores:
+                // 2 jugadores -> 4 fichas, 3 jugadores -> 3 fichas, 4 jugadores -> 2 fichas
+                let pointsToWin;
+                if (players.length <= 2) {
+                    pointsToWin = 4;
+                } else if (players.length === 3) {
+                    pointsToWin = 3;
+                } else {
+                    pointsToWin = 2;
+                }
+
+                room.pointsToWin = pointsToWin;
                 room.currentRound = 1;
                 room.deck = [];
                 room.discardPile = [];

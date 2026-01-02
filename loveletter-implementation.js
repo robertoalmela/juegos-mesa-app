@@ -2,16 +2,57 @@
 // LOVE LETTER - Implementación completa
 // ============================================
 
-// Definición de cartas
+// Definición de cartas (baraja clásica de 16 cartas)
+// Cada valor incluye nombre, número de copias, efecto y ruta de imagen
 const LOVE_LETTER_CARDS = {
-    1: { name: 'Guardia', count: 5, effect: 'Elige un jugador y nombra una carta (excepto Guardia). Si tiene esa carta, queda eliminado.', image: 'assets/loveletter/guardia.png' },
-    2: { name: 'Sacerdote', count: 2, effect: 'Mira la mano de otro jugador.' },
-    3: { name: 'Barón', count: 2, effect: 'Compara tu mano con otro jugador. El que tenga el número más bajo queda eliminado.' },
-    4: { name: 'Doncella', count: 2, effect: 'Estás protegido hasta tu próximo turno.' },
-    5: { name: 'Príncipe', count: 2, effect: 'Elige un jugador (puedes elegirte a ti). Ese jugador descarta su mano y roba una nueva carta.' },
-    6: { name: 'Rey', count: 1, effect: 'Intercambia tu mano con otro jugador.' },
-    7: { name: 'Condesa', count: 1, effect: 'Si tienes Rey o Príncipe en tu mano, DEBES jugar esta carta.' },
-    8: { name: 'Princesa', count: 1, effect: 'Si descartas esta carta, quedas eliminado.' }
+    1: {
+        name: 'Guardia',
+        count: 5,
+        effect: 'Elige a otro jugador y nombra una carta (no puede ser Guardia). Si ese jugador tiene esa carta, queda eliminado.',
+        image: 'assets/loveletter/guardia.png'
+    },
+    2: {
+        name: 'Sacerdote',
+        count: 2,
+        effect: 'Mira la carta de la mano de otro jugador.',
+        image: 'assets/loveletter/sacerdote.png'
+    },
+    3: {
+        name: 'Barón',
+        count: 2,
+        effect: 'Compárate con otro jugador. El que tenga la carta de menor valor queda eliminado.',
+        image: 'assets/loveletter/baron.png'
+    },
+    4: {
+        name: 'Doncella',
+        count: 2,
+        effect: 'Hasta tu próximo turno, eres inmune a los efectos de otras cartas.',
+        image: 'assets/loveletter/doncella.png'
+    },
+    5: {
+        name: 'Príncipe',
+        count: 2,
+        effect: 'Elige a un jugador (puedes elegirte). Descarta su carta y roba una nueva. Si descarta la Princesa, queda eliminado.',
+        image: 'assets/loveletter/principe.png'
+    },
+    6: {
+        name: 'Rey',
+        count: 1,
+        effect: 'Intercambia tu carta con la de otro jugador.',
+        image: 'assets/loveletter/rey.png'
+    },
+    7: {
+        name: 'Condesa',
+        count: 1,
+        effect: 'Si tienes en mano Rey (6) o Príncipe (5) junto con la Condesa, debes descartarla.',
+        image: 'assets/loveletter/condesa.png'
+    },
+    8: {
+        name: 'Princesa',
+        count: 1,
+        effect: 'Si descartas esta carta, quedas eliminado inmediatamente.',
+        image: 'assets/loveletter/princesa.png'
+    }
 };
 
 // Crear mazo completo
@@ -207,11 +248,12 @@ function playLoveLetter(roomCode, playerName) {
         // Mostrar mi mano
         if (!player.eliminated) {
             html += '<h3 style="margin-top: 20px;">Tu mano:</h3>';
-            player.hand.forEach((card, index) => {
+            player.hand.forEach((card) => {
                 html += `
                     <div class="love-letter-card">
                         <div class="card-number">${card.value}</div>
                         <div class="card-name">${card.name}</div>
+                        ${card.image ? `<img src="${card.image}" alt="${card.name}" style="width:100%; max-width:260px; border-radius:10px; margin:10px 0; box-shadow:0 2px 6px rgba(0,0,0,0.15);">` : ''}
                         <div class="card-effect">${card.effect}</div>
                     </div>
                 `;
