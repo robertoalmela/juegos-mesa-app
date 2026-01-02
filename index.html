@@ -433,7 +433,7 @@
                 </div>
                 <div class="game-card" onclick="selectGame('quickstop')">
                     <h3>🏃 Quick Stop</h3>
-                    <p>Completa categorías con palabras que empiecen con la letra indicada. ¡El más rápido gana!</p>
+                    <p>Empieza con 5 letras. Responde rápido con palabras según el tema. ¡El último en responder pierde!</p>
                 </div>
                 <div class="game-card" onclick="selectGame('loveletter')">
                     <h3>💌 Love Letter</h3>
@@ -485,11 +485,8 @@
 
             <!-- Configuración Quick Stop -->
             <div id="quickstopConfig" class="hidden">
-                <label>Número de Rondas:</label>
-                <input type="number" id="numRounds" value="5" min="1" max="20">
-
                 <div class="info">
-                    💡 Quick Stop no necesita lista de jugadores. Cada uno juega en su dispositivo.
+                    💡 Quick Stop: Cada jugador empieza con 5 letras. Responde rápido con palabras que empiecen con tu letra. ¡El último pierde!
                 </div>
             </div>
 
@@ -659,15 +656,9 @@
             }
             // Nuevos juegos no requieren config extra por ahora
 
-            // Quick Stop no necesita lista de jugadores
+            // Quick Stop ahora sí necesita lista de jugadores
             if (game === 'quickstop') {
-                document.getElementById('playerNames').value = 'No requerido';
-                document.getElementById('playerNames').disabled = true;
-            } else {
                 document.getElementById('playerNames').disabled = false;
-                if (document.getElementById('playerNames').value === 'No requerido') {
-                    document.getElementById('playerNames').value = '';
-                }
             }
         }
 
@@ -814,11 +805,30 @@
                     };
                 });
             } else if (selectedGame === 'quickstop') {
-                room.numRounds = parseInt(document.getElementById('numRounds').value) || 5;
-                room.currentRound = 1;
-                room.currentLetter = null;
-                room.categories = ['Nombre', 'Animal', 'Ciudad', 'Objeto', 'Comida', 'Color'];
+                // Generar letras con puntos (distribución Scrabble simplificada)
+                const letterPool = generateLetterPool();
+                
+                room.currentRound = 0;
+                room.currentPrompt = null;
+                room.phase = 'waiting'; // waiting, playing, results
+                room.roundAnswers = {};
+                room.roundStartTime = null;
                 room.players = {};
+                
+                // Dar 5 letras a cada jugador
+                players.forEach(name => {
+                    const hand = [];
+                    for (let i = 0; i < 5; i++) {
+                        if (letterPool.length > 0) {
+                            hand.push(letterPool.pop());
+                        }
+                    }
+                    room.players[name] = {
+                        hand: hand,
+                        score: 0,
+                        totalPoints: hand.reduce((sum, l) => sum + l.points, 0)
+                    };
+                });
             } else if (selectedGame === 'loveletter') {
                 room.pointsToWin = parseInt(document.getElementById('pointsToWin').value) || 4;
                 room.currentRound = 1;
@@ -2333,7 +2343,84 @@
             }
         }
 
-        // Quick Stop
+        // ============================================
+        // QUICK STOP - Nueva mecánica con letras
+        // ============================================
+
+        function generateLetterPool() {
+            // Letras con puntos (inspirado en Scrabble)
+            const letterData = [
+                { letter: 'A', points: 1, count: 12 },
+                { letter: 'E', points: 1, count: 12 },
+                { letter: 'O', points: 1, count: 9 },
+                { letter: 'I', points: 1, count: 6 },
+                { letter: 'S', points: 1, count: 6 },
+                { letter: 'N', points: 1, count: 5 },
+                { letter: 'L', points: 1, count: 4 },
+                { letter: 'R', points: 1, count: 5 },
+                { letter: 'U', points: 1, count: 5 },
+                { letter: 'T', points: 1, count: 4 },
+                { letter: 'D', points: 2, count: 5 },
+                { letter: 'G', points: 2, count: 2 },
+                { letter: 'C', points: 3, count: 4 },
+                { letter: 'B', points: 3, count: 2 },
+                { letter: 'M', points: 3, count: 2 },
+                { letter: 'P', points: 3, count: 2 },
+                { letter: 'H', points: 4, count: 2 },
+                { letter: 'F', points: 4, count: 1 },
+                { letter: 'V', points: 4, count: 1 },
+                { letter: 'Y', points: 4, count: 1 },
+                { letter: 'Q', points: 5, count: 1 },
+                { letter: 'J', points: 8, count: 1 },
+                { letter: 'Ñ', points: 8, count: 1 },
+                { letter: 'X', points: 8, count: 1 },
+                { letter: 'Z', points: 10, count: 1 }
+            ];
+            
+            const pool = [];
+            letterData.forEach(({ letter, points, count }) => {
+                for (let i = 0; i < count; i++) {
+                    pool.push({ letter, points });
+                }
+            });
+            
+            shuffleArray(pool);
+            return pool;
+        }
+
+        const QUICK_STOP_PROMPTS = [
+            'Algo que encuentras en la cocina',
+            'Un animal',
+            'Una ciudad o país',
+            'Una profesión',
+            'Algo que llevas en la mochila',
+            'Un deporte',
+            'Una comida o bebida',
+            'Algo que ves en el cielo',
+            'Un color',
+            'Una parte del cuerpo',
+            'Un objeto de la casa',
+            'Una marca famosa',
+            'Un instrumento musical',
+            'Una película o serie',
+            'Un juego o videojuego',
+            'Algo que tiene ruedas',
+            'Un lugar público',
+            'Una prenda de ropa',
+            'Un árbol o planta',
+            'Un sentimiento o emoción',
+            'Algo frío',
+            'Algo que huele bien',
+            'Un tipo de transporte',
+            'Una herramienta',
+            'Un mueble',
+            'Algo electrónico',
+            'Un nombre de persona',
+            'Algo que usas para escribir',
+            'Un tipo de música',
+            'Algo que está en el baño'
+        ];
+
         function playQuickStop(roomCode, playerName) {
             const gameContent = document.getElementById('gameContent');
             const gameHeader = document.getElementById('gameHeader');
@@ -2345,74 +2432,216 @@
                 const room = snapshot.val();
                 if (!room) return;
 
-                if (!room.players[playerName]) {
-                    database.ref(`rooms/${roomCode}/players/${playerName}`).set({
-                        score: 0,
-                        answers: {}
-                    });
+                const player = room.players[playerName];
+                if (!player) {
+                    gameContent.innerHTML = '<p style="color: red;">No estás registrado en esta partida</p>';
+                    return;
                 }
 
-                if (!room.currentLetter) {
-                    // Esperando inicio de ronda
-                    gameContent.innerHTML = `
-                        <h2 style="text-align: center; color: #667eea;">🏃 Quick Stop</h2>
+                // Detectar fin de juego
+                const playersWithLetters = Object.keys(room.players).filter(p => room.players[p].hand && room.players[p].hand.length > 0);
+                if (playersWithLetters.length === 0 || (room.phase === 'finished')) {
+                    const playerScores = Object.keys(room.players).map(p => ({
+                        name: p,
+                        points: room.players[p].hand.reduce((sum, l) => sum + l.points, 0)
+                    })).sort((a, b) => a.points - b.points);
+                    
+                    const winner = playerScores[0];
+                    
+                    let html = `
+                        <h2 style="text-align: center; color: #667eea;">🏆 FIN DEL JUEGO</h2>
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 40px; border-radius: 15px; text-align: center; margin: 30px 0;">
+                            <h1 style="font-size: 48px; margin: 0;">¡${winner.name.toUpperCase()} GANA!</h1>
+                            <p style="margin-top: 20px;">Puntos finales: ${winner.points}</p>
+                        </div>
+                        <h3>Clasificación final:</h3>
+                    `;
+                    
+                    playerScores.forEach((p, index) => {
+                        html += `
+                            <div style="background: ${index === 0 ? '#ffd700' : '#e7f3ff'}; padding: 15px; border-radius: 8px; margin: 5px 0; font-weight: bold;">
+                                ${index + 1}. ${p.name} - ${p.points} puntos
+                            </div>
+                        `;
+                    });
+                    
+                    gameContent.innerHTML = html;
+                    return;
+                }
+
+                let html = `<h2 style="text-align: center; color: #667eea;">🏃 Quick Stop</h2>`;
+                
+                // Mano del jugador
+                html += '<h3>Tu mano:</h3><div style="display: flex; gap: 10px; margin: 15px 0; flex-wrap: wrap;">';
+                player.hand.forEach((letterObj, index) => {
+                    html += `
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; border-radius: 10px; text-align: center; min-width: 60px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                            <div style="font-size: 32px; font-weight: bold;">${letterObj.letter}</div>
+                            <div style="font-size: 12px; opacity: 0.8;">${letterObj.points} pts</div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+
+                if (room.phase === 'waiting') {
+                    html += `
                         <div style="text-align: center; padding: 40px;">
-                            <h3>Ronda ${room.currentRound} de ${room.numRounds}</h3>
-                            <p style="margin: 20px 0;">Esperando que comience la ronda...</p>
+                            <p style="font-size: 18px;">Esperando que comience la ronda...</p>
                             ${Object.keys(room.players)[0] === playerName ?
-                            '<div class="btn" onclick="startQuickStopRound()">Iniciar Ronda</div>' :
+                            '<div class="btn" onclick="startQuickStopRound(\'' + roomCode + '\')">🎲 Iniciar Ronda</div>' :
                             '<p style="color: #666;">El primer jugador iniciará la ronda</p>'}
                         </div>
                     `;
-                } else {
-                    // Jugando
-                    let html = `
-                        <h2 style="text-align: center; color: #667eea;">🏃 Quick Stop - Ronda ${room.currentRound}</h2>
-                        <div style="background: #667eea; color: white; padding: 30px; border-radius: 15px; text-align: center; margin: 20px 0;">
-                            <h1 style="font-size: 72px; margin: 0;">Letra: ${room.currentLetter}</h1>
+                } else if (room.phase === 'playing') {
+                    const currentLetter = player.hand[0]; // Primera letra de la mano
+                    const hasAnswered = room.roundAnswers && room.roundAnswers[playerName];
+                    
+                    html += `
+                        <div style="background: #fffbea; padding: 20px; border-radius: 10px; margin: 20px 0; border: 3px solid #ffc107;">
+                            <h3 style="text-align: center; margin-bottom: 10px;">Tema:</h3>
+                            <div style="background: white; padding: 20px; border-radius: 8px; text-align: center; font-size: 24px; font-weight: bold; color: #667eea; margin-bottom: 15px;">
+                                ${room.currentPrompt}
+                            </div>
+                            <div style="text-align: center; margin: 15px 0;">
+                                <div style="font-size: 18px; margin-bottom: 10px;">Tu letra:</div>
+                                <div style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 10px; font-size: 48px; font-weight: bold;">
+                                    ${currentLetter.letter}
+                                </div>
+                            </div>
                         </div>
-                        <form onsubmit="submitQuickStopAnswers(event)">
                     `;
-
-                    room.categories.forEach((cat, index) => {
+                    
+                    if (!hasAnswered) {
                         html += `
-                            <label>${cat}:</label>
-                            <input type="text" id="cat_${index}" placeholder="Palabra con ${room.currentLetter}..." required>
+                            <label>Tu palabra (debe empezar con ${currentLetter.letter}):</label>
+                            <input type="text" id="quickstopAnswer" placeholder="Escribe tu palabra..." style="text-transform: uppercase;">
+                            <div class="btn" onclick="submitQuickStopAnswer('${roomCode}', '${playerName}', '${currentLetter.letter}')">✅ Enviar Palabra</div>
+                        `;
+                    } else {
+                        html += `
+                            <div class="info">✅ Has enviado: <strong>${room.roundAnswers[playerName]}</strong><br>Esperando a los demás jugadores...</div>
+                        `;
+                    }
+                    
+                    // Mostrar quién ha respondido
+                    const totalPlayers = Object.keys(room.players).filter(p => room.players[p].hand.length > 0).length;
+                    const answeredCount = Object.keys(room.roundAnswers || {}).length;
+                    html += `<p style="text-align: center; margin-top: 15px; color: #666;">Respuestas: ${answeredCount}/${totalPlayers}</p>`;
+                    
+                } else if (room.phase === 'results') {
+                    html += `
+                        <h3 style="text-align: center; color: #ff6b6b;">⏱️ Resultado de la ronda</h3>
+                        <div style="background: #ff6b6b; color: white; padding: 20px; border-radius: 10px; text-align: center; margin: 20px 0;">
+                            <h2>¡${room.lastLoser} fue el último!</h2>
+                            <p style="margin-top: 10px;">Pierde esta ronda</p>
+                        </div>
+                    `;
+                    
+                    html += '<h4>Respuestas de todos:</h4>';
+                    Object.entries(room.roundAnswers || {}).forEach(([pName, answer]) => {
+                        const isLoser = pName === room.lastLoser;
+                        html += `
+                            <div style="background: ${isLoser ? '#ffebee' : '#e7f3ff'}; padding: 12px; border-radius: 8px; margin: 5px 0; border-left: 4px solid ${isLoser ? '#ff6b6b' : '#667eea'};">
+                                <strong>${pName}:</strong> ${answer} ${isLoser ? '❌' : '✅'}
+                            </div>
                         `;
                     });
-
-                    html += `
-                            <div class="btn" onclick="submitQuickStopAnswers(event)">¡STOP!</div>
-                        </form>
-                    `;
-
-                    gameContent.innerHTML = html;
+                    
+                    if (Object.keys(room.players)[0] === playerName) {
+                        html += '<div class="btn" onclick="continueQuickStop(\'' + roomCode + '\')">Continuar</div>';
+                    } else {
+                        html += '<p style="text-align: center; color: #666; margin-top: 15px;">Esperando al primer jugador...</p>';
+                    }
                 }
+
+                gameContent.innerHTML = html;
             });
 
             showScreen('gameScreen');
         }
 
-        function startQuickStopRound() {
-            const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-            const randomLetter = letters.charAt(Math.floor(Math.random() * letters.length));
-
-            database.ref(`rooms/${currentRoom.code}/currentLetter`).set(randomLetter);
+        async function startQuickStopRound(roomCode) {
+            const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+            const room = snapshot.val();
+            
+            // Verificar que todos tengan letras
+            const playersWithLetters = Object.keys(room.players).filter(p => room.players[p].hand && room.players[p].hand.length > 0);
+            if (playersWithLetters.length === 0) {
+                alert('No hay jugadores con letras. El juego ha terminado.');
+                await database.ref(`rooms/${roomCode}/phase`).set('finished');
+                return;
+            }
+            
+            const randomPrompt = QUICK_STOP_PROMPTS[Math.floor(Math.random() * QUICK_STOP_PROMPTS.length)];
+            
+            await database.ref(`rooms/${roomCode}`).update({
+                phase: 'playing',
+                currentPrompt: randomPrompt,
+                roundAnswers: {},
+                roundStartTime: Date.now(),
+                currentRound: room.currentRound + 1
+            });
         }
 
-        async function submitQuickStopAnswers(event) {
-            event.preventDefault();
+        async function submitQuickStopAnswer(roomCode, playerName, expectedLetter) {
+            const answer = document.getElementById('quickstopAnswer').value.trim().toUpperCase();
+            
+            if (!answer) {
+                alert('Debes escribir una palabra');
+                return;
+            }
+            
+            if (!answer.startsWith(expectedLetter)) {
+                alert(`La palabra debe empezar con ${expectedLetter}`);
+                return;
+            }
+            
+            const timestamp = Date.now();
+            
+            await database.ref(`rooms/${roomCode}/roundAnswers/${playerName}`).set(answer);
+            await database.ref(`rooms/${roomCode}/roundTimestamps/${playerName}`).set(timestamp);
+            
+            // Verificar si todos han respondido
+            const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+            const room = snapshot.val();
+            const playersWithLetters = Object.keys(room.players).filter(p => room.players[p].hand && room.players[p].hand.length > 0);
+            const answeredCount = Object.keys(room.roundAnswers || {}).length;
+            
+            if (answeredCount >= playersWithLetters.length) {
+                // Todos respondieron, determinar el último
+                const timestamps = room.roundTimestamps || {};
+                const sortedPlayers = Object.keys(timestamps).sort((a, b) => timestamps[b] - timestamps[a]);
+                const lastPlayer = sortedPlayers[0];
+                
+                // El último pierde su primera letra
+                const loserHand = room.players[lastPlayer].hand;
+                const removedLetter = loserHand.shift(); // Quitar primera letra
+                
+                await database.ref(`rooms/${roomCode}`).update({
+                    phase: 'results',
+                    lastLoser: lastPlayer,
+                    [`players/${lastPlayer}/hand`]: loserHand
+                });
+            }
+        }
 
-            const playerName = document.getElementById('playerName').value.trim();
-            const answers = {};
-
-            currentRoom.categories.forEach((cat, index) => {
-                answers[cat] = document.getElementById(`cat_${index}`).value.trim();
-            });
-
-            await database.ref(`rooms/${currentRoom.code}/players/${playerName}/answers/round${currentRoom.currentRound}`).set(answers);
-
-            alert('¡Respuestas enviadas! Espera a que todos terminen para ver los resultados.');
+        async function continueQuickStop(roomCode) {
+            const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+            const room = snapshot.val();
+            
+            // Verificar si alguien se quedó sin letras
+            const playersWithLetters = Object.keys(room.players).filter(p => room.players[p].hand && room.players[p].hand.length > 0);
+            
+            if (playersWithLetters.length === 0) {
+                await database.ref(`rooms/${roomCode}/phase`).set('finished');
+            } else {
+                await database.ref(`rooms/${roomCode}`).update({
+                    phase: 'waiting',
+                    roundAnswers: {},
+                    roundTimestamps: {},
+                    lastLoser: null
+                });
+            }
         }
 
         // Utilidades
@@ -2508,16 +2737,19 @@
                     <p><strong>Spymaster clickea las palabras</strong> que elijan los operatives para revelarlas.</p>
             `,
                 quickstop: `
-                < h3 >🏃 Quick Stop - Reglas</h3 >
-                    <p><strong>Objetivo:</strong> Ser el primero en completar todas las categorías</p>
+                    <h3>🏃 Quick Stop - Reglas</h3>
+                    <p><strong>Objetivo:</strong> Ser el primero en quedarte sin letras</p>
                     <p><strong>Cómo jugar:</strong></p>
                     <ol>
-                        <li>Se elige una letra aleatoria</li>
-                        <li>Completa cada categoría con palabras que empiecen con esa letra</li>
-                        <li>El primero en terminar grita "¡STOP!"</li>
-                        <li>Comparan respuestas: única = 10pts, repetida = 5pts, vacía = 0pts</li>
+                        <li>Cada jugador empieza con 5 letras en su mano (cada letra tiene puntos)</li>
+                        <li>Se muestra un tema común para todos</li>
+                        <li>Cada jugador ve solo su primera letra</li>
+                        <li>Escribe UNA palabra que empiece con tu letra y responda al tema</li>
+                        <li>El último en enviar su palabra PIERDE y elimina esa letra de su mano</li>
+                        <li>El juego continúa hasta que alguien se quede sin letras</li>
                     </ol>
-                    <p><strong>Categorías:</strong> Nombre, Animal, Ciudad, Objeto, Comida, Color</p>
+                    <p><strong>Ganador:</strong> Quien se queda sin letras primero. El resto suma los puntos de sus letras restantes.</p>
+                    <p><strong>Ejemplos de temas:</strong> Un animal, Algo que encuentras en la cocina, Una ciudad, Un deporte, etc.</p>
             `,
                 loveletter: `
                 < h3 >💌 Love Letter - Reglas</h3 >
