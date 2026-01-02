@@ -53,7 +53,7 @@ const GAME_DATA = {
     quickstop: {
         title: '🏃 Quick Stop',
         desc: 'Completa categorías con palabras que empiecen con la letra indicada.',
-        players: 'No requiere lista de jugadores'
+        players: 'Mínimo 2 jugadores (requiere lista previa de jugadores)'
     },
     loveletter: {
         title: '💌 Love Letter',
@@ -133,14 +133,12 @@ function selectGameFromDropdown(game) {
         espectroCfg.classList.remove('hidden');
     }
 
-    // Quick Stop no necesita lista de jugadores
-    if (game === 'quickstop') {
-        document.getElementById('playerNames').value = 'No requerido';
-        document.getElementById('playerNames').disabled = true;
-    } else {
-        document.getElementById('playerNames').disabled = false;
-        if (document.getElementById('playerNames').value === 'No requerido') {
-            document.getElementById('playerNames').value = '';
+    // Todos los juegos usan ahora lista de jugadores
+    const playerNamesEl = document.getElementById('playerNames');
+    if (playerNamesEl) {
+        playerNamesEl.disabled = false;
+        if (playerNamesEl.value === 'No requerido') {
+            playerNamesEl.value = '';
         }
     }
 }
