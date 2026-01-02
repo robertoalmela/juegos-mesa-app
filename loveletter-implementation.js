@@ -68,9 +68,17 @@ function createLoveLetterDeck() {
     return deck;
 }
 
+function normalizeRoomCode(roomCode) {
+    if (typeof roomCode === 'string') return roomCode;
+    if (roomCode && typeof roomCode.textContent === 'string') return roomCode.textContent.trim();
+    if (roomCode && typeof roomCode.code === 'string') return roomCode.code.trim();
+    return String(roomCode || '').trim();
+}
+
 // Iniciar nueva ronda de Love Letter
 async function startLoveLetterRound(roomCode) {
-    const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+    const code = normalizeRoomCode(roomCode);
+    const snapshot = await database.ref(`rooms/${code}`).once('value');
     const room = snapshot.val();
 
     // Crear y barajar mazo
@@ -297,7 +305,8 @@ function renderScoreboard(room) {
 
 // Robar carta al inicio del turno
 async function drawLoveLetterCard(roomCode, playerName) {
-    const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+    const code = normalizeRoomCode(roomCode);
+    const snapshot = await database.ref(`rooms/${code}`).once('value');
     const room = snapshot.val();
 
     if (!Array.isArray(room.deck) || room.deck.length === 0) {
@@ -321,7 +330,8 @@ async function drawLoveLetterCard(roomCode, playerName) {
 
 // Jugar una carta
 async function playLoveLetterCard(roomCode, playerName, cardIndex) {
-    const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+    const code = normalizeRoomCode(roomCode);
+    const snapshot = await database.ref(`rooms/${code}`).once('value');
     const room = snapshot.val();
 
     const player = room.players[playerName];
@@ -361,6 +371,8 @@ async function playLoveLetterCard(roomCode, playerName, cardIndex) {
 
 // Aplicar efecto de carta
 async function applyLoveLetterCardEffect(roomCode, playerName, card, room, updates) {
+    const code = normalizeRoomCode(roomCode);
+
     switch (card.value) {
         case 1: // Guardia
             const targetName = prompt('Elige un jugador (nombre exacto):');
@@ -492,17 +504,18 @@ async function applyLoveLetterCardEffect(roomCode, playerName, card, room, updat
 
     updates.currentTurnIndex = nextTurnIndex;
 
-    await database.ref(`rooms/${roomCode}`).update(updates);
+    await database.ref(`rooms/${code}`).update(updates);
 }
 
 // Finalizar ronda y dar punto al ganador
 async function endLoveLetterRound(roomCode, winnerName) {
-    const snapshot = await database.ref(`rooms/${roomCode}`).once('value');
+    const code = normalizeRoomCode(roomCode);
+    const snapshot = await database.ref(`rooms/${code}`).once('value');
     const room = snapshot.val();
 
     const newScore = room.players[winnerName].score + 1;
 
-    await database.ref(`rooms/${roomCode}`).update({
+    await database.ref(`rooms/${code}`).update({
         [`players/${winnerName}/score`]: newScore,
         currentRound: room.currentRound + 1,
         roundInProgress: false,
